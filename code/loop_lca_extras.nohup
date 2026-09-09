@@ -1,0 +1,276 @@
+nohup: ignoring input
+Loading taxonomy database...
+Loading BLAST results from blast/8177.blast.txt...
+50261893 hits across 356599 queries after filtering.
+Computing LCA...
+Done. Results written to lca/8177.blast.lca
+Loading taxonomy database...
+Loading BLAST results from blast/8186-M1-F1-Afimb.blast.txt...
+code/loop_lca_extras.sh: line 4: 69732 Killed                  code/lca.py -i blast/8186-M1-F1-Afimb.blast.txt -o lca/8186-M1-F1-Afimb.blast.lca --nodes taxdump/nodes.dmp --names taxdump/names.dmp --top-percent 10 --pident 80
+Loading taxonomy database...
+Loading BLAST results from blast/8334-AMLoculosum-BriddledTurn.blast.txt...
+59532469 hits across 828263 queries after filtering.
+Computing LCA...
+Done. Results written to lca/8334-AMLoculosum-BriddledTurn7.blast.lca
+Loading taxonomy database...
+Loading BLAST results from blast/8336-Argasidae-4L-Boobie.blast.txt...
+code/loop_lca_extras.sh: line 6: 71493 Killed                  code/lca.py -i blast/8336-Argasidae-4L-Boobie.blast.txt -o lca/8336-Argasidae-4L-Boobie.blast.lca --nodes taxdump/nodes.dmp --names taxdump/names.dmp --top-percent 10 --pident 80
+Loading taxonomy database...
+Loading BLAST results from blast/8378-Alimbatum-1F-3M-DescarteIs.blast.txt...
+1482404 hits across 18225 queries after filtering.
+Computing LCA...
+Done. Results written to lca/8378-Alimbatum-1F-3M-DescarteIs.blast.lca
+Loading taxonomy database...
+Loading BLAST results from blast/8392-18-4-24-Amoreliae-1F.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8392-18-4-24-Amoreliae-1F.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8394-Btachyg-2M-5Legs-EastEnd.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8394-Btachyg-2M-5Legs-EastEnd.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8395-Btachyg-2M-3Legs-Damscus.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8395-Btachyg-2M-3Legs-Damscus.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8398-Booyal-3-H-B-F.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8398-Booyal-3-H-B-F.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8399-F-Benaraby-M-gig-14-4-24.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8399-F-Benaraby-M-gig-14-4-24.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8401-Hban-1F-Farnborough.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8401-Hban-1F-Farnborough.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8404-Amtrig-M-EtnaCk.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8404-Amtrig-M-EtnaCk.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/8405-Bhydrosauri-1F-VIC.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/8405-Bhydrosauri-1F-VIC.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/B5056b_F1_S7.blast.txt...
+Traceback (most recent call last):
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 133, in <module>
+    main()
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 117, in main
+    df = load_blast(args.input, args.evalue, args.pident)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis/code/lca.py", line 33, in load_blast
+    df = pd.read_csv(filepath, sep='\t', names=cols)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 873, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 300, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1645, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/parsers/readers.py", line 1904, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/data/hb-austick/work/miniforge3/lib/python3.12/site-packages/pandas/io/common.py", line 930, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'blast/B5056b_F1_S7.blast.txt'
+Loading taxonomy database...
+Loading BLAST results from blast/B6859_M1_25_9_S4.blast.txt...
+623 hits across 62 queries after filtering.
+Computing LCA...
+Done. Results written to lca/B6859_M1_25_9_S4.blast.lca
+Loading taxonomy database...
+Loading BLAST results from blast/4995-Argus.blast.txt...
+code/loop_lca_extras.sh: line 18: 71622 Killed                  code/lca.py -i blast/4995-Argus.blast.txt -o lca/4995-Argus.blast.lca --nodes taxdump/nodes.dmp --names taxdump/names.dmp --top-percent 10 --pident 80
+Loading taxonomy database...
+Loading BLAST results from blast/4480-F1-Isimp.blast.txt...
+code/loop_lca_extras.sh: line 19: 73083 Killed                  code/lca.py -i blast/4480-F1-Isimp.blast.txt -o lca/4480-F1-Isimp.blast.lca --nodes taxdump/nodes.dmp --names taxdump/names.dmp --top-percent 10 --pident 80

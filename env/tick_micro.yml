@@ -1,0 +1,34 @@
+# Conda environment for the R side of the tick microbiome analysis.
+#
+# The base R at /data/hb-austick/work/miniforge3/bin/R (4.3.3) has NO analysis
+# packages installed, and mutating base would affect other projects. This env is
+# self-contained.
+#
+#   mamba env create -f env/tick_micro.yml
+#   conda activate tick_micro
+#
+# R 4.3 pins Bioconductor 3.18, which carries mia 1.10.
+name: tick_micro
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.3
+  # --- core object model -------------------------------------------------
+  - bioconductor-mia
+  - bioconductor-treesummarizedexperiment
+  - bioconductor-summarizedexperiment
+  - bioconductor-scater
+  - bioconductor-miaviz
+  # --- ecology / stats ---------------------------------------------------
+  - r-vegan
+  - bioconductor-decontam        # frequency method: needs DNA conc, not blanks
+  # --- data handling and plotting ----------------------------------------
+  - r-tidyverse
+  - r-data.table
+  - r-yaml
+  - r-ggplot2
+  - r-patchwork
+  - r-pheatmap
+  - r-RColorBrewer
+  - r-ggrepel

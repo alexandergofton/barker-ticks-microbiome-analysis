@@ -1,0 +1,28 @@
+# Conda environment for the marker-gene extraction and alignment workflow
+# (code/analysis/11..16, driven by run_markers.sh).
+#
+#   mamba env create -f env/tick_markers.yml
+#   conda activate tick_markers
+#
+# The base miniforge3 already carries blast+, seqkit, samtools, hmmer and
+# prodigal; this env adds the aligners and tree builders, which are absent.
+# The scripts locate their tools via $PATH, so activating this env is enough --
+# nothing in the code hardcodes a path into it.
+name: tick_markers
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pyyaml
+  # --- alignment ---------------------------------------------------------
+  - mafft                # primary aligner; --adjustdirection for rRNA
+  - muscle               # alternative, selectable via config
+  # --- search ------------------------------------------------------------
+  - blast                # blastn / tblastn / makeblastdb
+  - seqkit
+  - samtools
+  # --- optional downstream (you build the trees, these are here if wanted) -
+  - trimal
+  - iqtree
+  - fasttree

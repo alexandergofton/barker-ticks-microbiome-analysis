@@ -1,0 +1,50 @@
+# Pathogen and endosymbiont taxa of interest for the targeted follow-up analysis.
+#
+# `taxon` is matched against the genus column first, then family, then any rank
+# in the lineage, so a family-level entry (e.g. Nairoviridae) captures every
+# genus beneath it.
+#
+# category:
+#   pathogen      vertebrate/human pathogen
+#   endosymbiont  maternally inherited tick symbiont
+#   both          genus contains both pathogenic and symbiotic lineages
+#   uncertain     tick-associated, pathogenic status unresolved
+#
+# NOTE ON "both": Coxiella, Rickettsia and Francisella each contain obligate
+# tick endosymbionts AND genuine pathogens that are near-identical over short
+# contigs. A genus-level hit in these three does NOT establish pathogen
+# presence -- that is exactly what the follow-up per-taxon phylogenetics is for.
+# results/targets/target_contig_index.tsv gives the contigs to start from.
+taxon	rank_hint	category	note
+Rickettsia	genus	both	spotted fever group pathogens + non-pathogenic endosymbionts
+Anaplasma	genus	pathogen	A. marginale, A. phagocytophilum
+Ehrlichia	genus	pathogen	E. chaffeensis and relatives
+Neoehrlichia	genus	pathogen	Candidatus Neoehrlichia spp.
+Borrelia	genus	pathogen	relapsing fever / Lyme group
+Borreliella	genus	pathogen	Lyme borreliosis group (split from Borrelia)
+Coxiella	genus	both	C. burnetii (Q fever) vs Coxiella-like endosymbionts
+Francisella	genus	both	F. tularensis vs Francisella-like endosymbionts
+Bartonella	genus	pathogen	
+Midichloria	genus	endosymbiont	Candidatus Midichloria mitochondrii, classic Ixodes symbiont
+Wolbachia	genus	endosymbiont	usually from parasitoid wasps rather than the tick itself
+Spiroplasma	genus	endosymbiont	
+Rickettsiella	genus	endosymbiont	
+Arsenophonus	genus	endosymbiont	
+Cardinium	genus	endosymbiont	
+Lariskella	genus	endosymbiont	
+Babesia	genus	pathogen	piroplasm
+Theileria	genus	pathogen	piroplasm
+Hepatozoon	genus	pathogen	apicomplexan
+Cytauxzoon	genus	pathogen	piroplasm
+Trypanosoma	genus	pathogen	
+Hemolivia	genus	pathogen	reptile-associated apicomplexan
+Nairoviridae	family	pathogen	incl. CCHF group
+Phenuiviridae	family	pathogen	incl. Uukuvirus / SFTS group
+Flaviviridae	family	pathogen	incl. tick-borne encephalitis group
+Chuviridae	family	uncertain	common tick-associated virus family
+Rhabdoviridae	family	uncertain	
+Orthomyxoviridae	family	pathogen	incl. Quaranjavirus
+Reoviridae	family	uncertain	incl. Coltivirus
+Peribunyaviridae	family	uncertain	
+Mycoplasma	genus	uncertain	haemotropic spp. relevant; most are not tick-borne
+Candidatus Lariskella	genus	endosymbiont	

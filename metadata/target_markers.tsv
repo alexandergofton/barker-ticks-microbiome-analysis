@@ -1,0 +1,148 @@
+# Phylogenetic marker gene panel, one row per target x marker.
+#
+# This table drives the whole marker workflow (code/analysis/11..16). Edit it
+# rather than the scripts: add a row to add a locus, delete a row to drop one.
+#
+# WHY A PER-TARGET PANEL: 16S rRNA does not resolve Rickettsia to species and
+# barely separates the Coxiella-like endosymbionts from C. burnetii. The
+# discriminatory locus differs by genus (gltA/ompA/ompB/sca4 for Rickettsia,
+# flaB for Borrelia, msp4 for Anaplasma, cox1/cytb for the piroplasms), so the
+# panel is defined per target and every locus is searched independently. A
+# target is NOT expected to yield every locus -- the assembly decides that.
+#
+# COLUMNS
+#   target        must match a `taxon` in metadata/target_taxa.tsv
+#   marker        short locus label; becomes part of every sequence name
+#   marker_type   rrna    -> reference nucleotide seqs, found with blastn
+#                 protein -> reference protein seqs, found with tblastn,
+#                            aligned codon-aware
+#   entrez_db     nuccore | protein
+#   n_refs        how many reference sequences to fetch for searching
+#   min_aln_len   minimum HSP length to keep a hit (bp for rrna, aa for protein)
+#   min_pident    minimum percent identity to keep a hit
+#   query         Entrez search term. Multiple alternatives may be separated by
+#                 ' ||| ' -- they are tried in order until one returns hits, so
+#                 a curated phrase can fall back to a looser one. These refs are
+#                 used ONLY to locate and orient the locus; they are not the
+#                 reference set for your tree, which you add by hand.
+target	marker	marker_type	entrez_db	n_refs	min_aln_len	min_pident	query
+Rickettsia	16S	rrna	nuccore	25	250	85	Rickettsia[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Rickettsia	gltA	protein	protein	20	50	50	"citrate synthase"[Protein Name] AND Rickettsia[Organism] AND srcdb_refseq[PROP] ||| gltA[All Fields] AND Rickettsia[Organism] AND 350:450[SLEN]
+Rickettsia	ompA	protein	protein	20	50	40	Rickettsia[Organism] AND "outer membrane protein A"[Protein Name] AND srcdb_refseq[PROP] ||| Rickettsia[Organism] AND ompA[All Fields] AND 1500:2500[SLEN]
+Rickettsia	ompB	protein	protein	20	50	40	Rickettsia[Organism] AND "outer membrane protein B"[Protein Name] AND srcdb_refseq[PROP] ||| Rickettsia[Organism] AND ompB[All Fields] AND 1400:1800[SLEN]
+Rickettsia	sca4	protein	protein	20	50	40	Rickettsia[Organism] AND "cell surface antigen Sca4"[Protein Name] ||| Rickettsia[Organism] AND sca4[All Fields] AND 900:1200[SLEN]
+Rickettsia	htrA_17kDa	protein	protein	20	40	40	Rickettsia[Organism] AND "17 kDa surface antigen"[Protein Name] ||| Rickettsia[Organism] AND "17 kDa"[All Fields] AND 120:200[SLEN]
+Rickettsia	groEL	protein	protein	15	50	55	Rickettsia[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Anaplasma	16S	rrna	nuccore	25	250	85	Anaplasma[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Anaplasma	gltA	protein	protein	20	50	50	"citrate synthase"[Protein Name] AND Anaplasma[Organism] AND srcdb_refseq[PROP] ||| gltA[All Fields] AND Anaplasma[Organism] AND 350:500[SLEN]
+Anaplasma	groEL	protein	protein	15	50	55	Anaplasma[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Anaplasma	msp4	protein	protein	20	40	40	Anaplasma[Organism] AND "major surface protein 4"[Protein Name] AND srcdb_refseq[PROP] ||| Anaplasma[Organism] AND msp4[All Fields] AND 200:400[SLEN]
+Anaplasma	msp2_p44	protein	protein	20	40	35	Anaplasma[Organism] AND "major surface protein 2"[Protein Name] AND srcdb_refseq[PROP] ||| Anaplasma[Organism] AND p44[All Fields] AND 300:500[SLEN]
+Ehrlichia	16S	rrna	nuccore	25	250	85	Ehrlichia[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Ehrlichia	gltA	protein	protein	20	50	50	"citrate synthase"[Protein Name] AND Ehrlichia[Organism] AND srcdb_refseq[PROP] ||| gltA[All Fields] AND Ehrlichia[Organism] AND 350:500[SLEN]
+Ehrlichia	groEL	protein	protein	15	50	55	Ehrlichia[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Ehrlichia	p28_omp1	protein	protein	20	40	35	Ehrlichia[Organism] AND "outer membrane protein"[Protein Name] AND srcdb_refseq[PROP] AND 250:350[SLEN] ||| Ehrlichia[Organism] AND p28[All Fields] AND 250:350[SLEN]
+Neoehrlichia	16S	rrna	nuccore	20	250	85	Neoehrlichia[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN] ||| "Candidatus Neoehrlichia"[Organism] AND 16S[Title]
+Neoehrlichia	gltA	protein	protein	15	50	50	Neoehrlichia[Organism] AND "citrate synthase"[Protein Name] ||| Neoehrlichia[Organism] AND gltA[All Fields]
+Neoehrlichia	groEL	protein	protein	15	50	55	Neoehrlichia[Organism] AND "chaperonin GroEL"[Protein Name] ||| Neoehrlichia[Organism] AND groEL[All Fields]
+Borrelia	16S	rrna	nuccore	25	250	85	Borrelia[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Borrelia	flaB	protein	protein	20	40	50	Borrelia[Organism] AND "flagellin B"[Protein Name] ||| Borrelia[Organism] AND flaB[All Fields] AND 250:400[SLEN]
+Borrelia	glpQ	protein	protein	15	50	45	Borrelia[Organism] AND "glycerophosphodiester phosphodiesterase"[Protein Name] AND srcdb_refseq[PROP]
+Borrelia	clpA	protein	protein	15	50	50	Borrelia[Organism] AND "ATP-dependent Clp protease"[Protein Name] AND srcdb_refseq[PROP] AND 700:900[SLEN] ||| Borrelia[Organism] AND clpA[All Fields] AND 700:900[SLEN]
+Borrelia	ospA	protein	protein	15	40	35	Borrelia[Organism] AND "outer surface protein A"[Protein Name] ||| Borrelia[Organism] AND ospA[All Fields] AND 200:300[SLEN]
+Borrelia	rrs_rrlA_IGS	rrna	nuccore	15	200	80	Borrelia[Organism] AND "16S-23S ribosomal RNA intergenic spacer"[Title] ||| Borrelia[Organism] AND "intergenic spacer"[Title] AND 200:1500[SLEN]
+Borreliella	16S	rrna	nuccore	25	250	85	Borreliella[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN] ||| Borrelia burgdorferi[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Borreliella	flaB	protein	protein	20	40	50	Borreliella[Organism] AND "flagellin B"[Protein Name] ||| Borreliella[Organism] AND flaB[All Fields] AND 250:400[SLEN]
+Borreliella	ospA	protein	protein	15	40	35	Borreliella[Organism] AND "outer surface protein A"[Protein Name] ||| Borreliella[Organism] AND ospA[All Fields] AND 200:300[SLEN]
+Borreliella	clpA	protein	protein	15	50	50	Borreliella[Organism] AND "Clp protease"[All Fields] AND 700:900[SLEN] ||| Borreliella[Organism] AND clpA[All Fields] AND 700:900[SLEN]
+Coxiella	16S	rrna	nuccore	25	250	85	Coxiella[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Coxiella	rpoB	protein	protein	15	60	55	Coxiella[Organism] AND "DNA-directed RNA polymerase subunit beta"[Protein Name] AND srcdb_refseq[PROP]
+Coxiella	dnaK	protein	protein	15	60	60	Coxiella[Organism] AND "molecular chaperone DnaK"[Protein Name] AND srcdb_refseq[PROP] ||| Coxiella[Organism] AND dnaK[All Fields] AND 600:700[SLEN]
+Coxiella	groEL	protein	protein	15	50	60	Coxiella[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Coxiella	IS1111	rrna	nuccore	15	200	80	Coxiella[Organism] AND IS1111[All Fields] AND 300:2000[SLEN]
+Coxiella	icd	protein	protein	15	50	55	Coxiella[Organism] AND icd[All Fields] AND 380:480[SLEN] ||| Coxiella[Organism] AND "isocitrate dehydrogenase"[All Fields]
+Francisella	16S	rrna	nuccore	25	250	85	Francisella[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Francisella	sdhA	protein	protein	15	50	55	Francisella[Organism] AND "succinate dehydrogenase flavoprotein subunit"[Protein Name] AND srcdb_refseq[PROP]
+Francisella	rpoB	protein	protein	15	60	55	Francisella[Organism] AND "DNA-directed RNA polymerase subunit beta"[Protein Name] AND srcdb_refseq[PROP]
+Francisella	pdpD	protein	protein	15	50	40	Francisella[Organism] AND pdpD[All Fields] AND 800:1400[SLEN] ||| Francisella[Organism] AND "pathogenicity determinant protein D"[Protein Name]
+Francisella	groEL	protein	protein	15	50	60	Francisella[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Bartonella	16S	rrna	nuccore	20	250	85	Bartonella[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Bartonella	gltA	protein	protein	20	50	50	"citrate synthase"[Protein Name] AND Bartonella[Organism] AND srcdb_refseq[PROP]
+Bartonella	rpoB	protein	protein	15	60	55	Bartonella[Organism] AND "DNA-directed RNA polymerase subunit beta"[Protein Name] AND srcdb_refseq[PROP]
+Bartonella	ftsZ	protein	protein	15	50	55	Bartonella[Organism] AND "cell division protein FtsZ"[Protein Name] AND srcdb_refseq[PROP]
+Bartonella	groEL	protein	protein	15	50	60	Bartonella[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Midichloria	16S	rrna	nuccore	20	250	85	Midichloria[Organism] AND 16S[Title] AND 500:1600[SLEN] ||| "Candidatus Midichloria"[Organism] AND 16S[Title]
+Midichloria	gltA	protein	protein	15	50	45	Midichloria[Organism] AND "citrate synthase"[All Fields] ||| Rickettsiaceae[Organism] AND "citrate synthase"[Protein Name] AND srcdb_refseq[PROP]
+Midichloria	groEL	protein	protein	15	50	55	Midichloria[Organism] AND "chaperonin GroEL"[Protein Name] ||| Midichloria[Organism] AND groEL[All Fields]
+Midichloria	ftsZ	protein	protein	15	50	50	Midichloria[Organism] AND "cell division protein FtsZ"[Protein Name] ||| Midichloria[Organism] AND ftsZ[All Fields]
+Wolbachia	16S	rrna	nuccore	20	250	85	Wolbachia[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN]
+Wolbachia	ftsZ	protein	protein	15	50	55	Wolbachia[Organism] AND "cell division protein FtsZ"[Protein Name] AND srcdb_refseq[PROP]
+Wolbachia	coxA	protein	protein	15	50	55	Wolbachia[Organism] AND "cytochrome c oxidase subunit"[Protein Name] AND srcdb_refseq[PROP] ||| Wolbachia[Organism] AND coxA[All Fields]
+Wolbachia	fbpA	protein	protein	15	50	50	Wolbachia[Organism] AND fbpA[All Fields] ||| Wolbachia[Organism] AND "fructose-bisphosphate aldolase"[Protein Name] AND srcdb_refseq[PROP]
+Wolbachia	gatB	protein	protein	15	50	55	Wolbachia[Organism] AND "aspartyl/glutamyl-tRNA(Asn/Gln) amidotransferase subunit B"[Protein Name] AND srcdb_refseq[PROP] ||| Wolbachia[Organism] AND gatB[All Fields]
+Wolbachia	wsp	protein	protein	15	40	35	Wolbachia[Organism] AND "Wolbachia surface protein"[All Fields] AND 200:300[SLEN] ||| Wolbachia[Organism] AND wsp[All Fields] AND 200:300[SLEN]
+Wolbachia	groEL	protein	protein	15	50	60	Wolbachia[Organism] AND "chaperonin GroEL"[Protein Name] AND srcdb_refseq[PROP]
+Spiroplasma	16S	rrna	nuccore	20	250	85	Spiroplasma[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN]
+Spiroplasma	rpoB	protein	protein	15	60	50	Spiroplasma[Organism] AND "DNA-directed RNA polymerase subunit beta"[Protein Name] AND srcdb_refseq[PROP]
+Spiroplasma	dnaA	protein	protein	15	50	50	Spiroplasma[Organism] AND "chromosomal replication initiator protein DnaA"[Protein Name] AND srcdb_refseq[PROP]
+Spiroplasma	ftsZ	protein	protein	15	50	50	Spiroplasma[Organism] AND "cell division protein FtsZ"[Protein Name] AND srcdb_refseq[PROP]
+Rickettsiella	16S	rrna	nuccore	20	250	85	Rickettsiella[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN]
+Rickettsiella	gltA	protein	protein	15	50	50	Rickettsiella[Organism] AND "citrate synthase"[Protein Name] ||| Rickettsiella[Organism] AND gltA[All Fields]
+Rickettsiella	rpoB	protein	protein	15	60	50	Rickettsiella[Organism] AND "DNA-directed RNA polymerase subunit beta"[Protein Name] ||| Rickettsiella[Organism] AND rpoB[All Fields] AND 1000:1500[SLEN]
+Rickettsiella	ftsZ	protein	protein	15	50	50	Rickettsiella[Organism] AND "cell division protein FtsZ"[Protein Name] ||| Rickettsiella[Organism] AND ftsZ[All Fields]
+Arsenophonus	16S	rrna	nuccore	20	250	85	Arsenophonus[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN]
+Arsenophonus	fbaA	protein	protein	15	50	55	Arsenophonus[Organism] AND "fructose-bisphosphate aldolase"[Protein Name] ||| Arsenophonus[Organism] AND fbaA[All Fields]
+Arsenophonus	yaeT	protein	protein	15	50	55	Arsenophonus[Organism] AND "outer membrane protein assembly factor BamA"[Protein Name] ||| Arsenophonus[Organism] AND yaeT[All Fields]
+Arsenophonus	groEL	protein	protein	15	50	60	Arsenophonus[Organism] AND "chaperonin GroEL"[Protein Name] ||| Arsenophonus[Organism] AND groEL[All Fields]
+Cardinium	16S	rrna	nuccore	20	250	85	Cardinium[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN] ||| "Candidatus Cardinium"[Organism] AND 16S[Title]
+Cardinium	gyrB	protein	protein	15	50	50	Cardinium[Organism] AND "DNA gyrase subunit B"[Protein Name] ||| Cardinium[Organism] AND gyrB[All Fields]
+Cardinium	groEL	protein	protein	15	50	55	Cardinium[Organism] AND "chaperonin GroEL"[Protein Name] ||| Cardinium[Organism] AND groEL[All Fields]
+Lariskella	16S	rrna	nuccore	20	250	85	Lariskella[Organism] AND 16S[Title] ||| "Candidatus Lariskella"[Organism] AND 16S[Title]
+Lariskella	gltA	protein	protein	15	50	45	Lariskella[Organism] AND "citrate synthase"[Protein Name] ||| Lariskella[Organism] AND gltA[All Fields]
+Lariskella	groEL	protein	protein	15	50	55	Lariskella[Organism] AND groEL[All Fields] ||| Lariskella[Organism] AND "chaperonin GroEL"[Protein Name]
+Candidatus Lariskella	16S	rrna	nuccore	20	250	85	"Candidatus Lariskella"[Organism] AND 16S[Title] ||| Lariskella[Organism] AND 16S[Title]
+Candidatus Lariskella	gltA	protein	protein	15	50	45	"Candidatus Lariskella"[Organism] AND gltA[All Fields] ||| Lariskella[Organism] AND "citrate synthase"[Protein Name]
+Mycoplasma	16S	rrna	nuccore	25	250	85	Mycoplasma[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1600[SLEN]
+Mycoplasma	rpoB	protein	protein	15	60	50	Mycoplasma[Organism] AND "DNA-directed RNA polymerase subunit beta"[Protein Name] AND srcdb_refseq[PROP]
+Mycoplasma	rnpB	rrna	nuccore	15	200	80	Mycoplasma[Organism] AND rnpB[All Fields] AND 200:500[SLEN] ||| Mycoplasma[Organism] AND "RNase P RNA"[Title]
+Babesia	18S	rrna	nuccore	25	250	85	Babesia[Organism] AND "18S ribosomal RNA"[Title] AND 1500:1900[SLEN]
+Babesia	cox1	protein	protein	20	50	55	Babesia[Organism] AND "cytochrome c oxidase subunit I"[Protein Name]
+Babesia	cytb	protein	protein	20	50	55	Babesia[Organism] AND "cytochrome b"[Protein Name]
+Babesia	beta_tubulin	protein	protein	15	60	65	Babesia[Organism] AND "beta-tubulin"[Protein Name] ||| Babesia[Organism] AND "tubulin beta chain"[Protein Name]
+Babesia	ITS	rrna	nuccore	15	200	80	Babesia[Organism] AND "internal transcribed spacer"[Title] AND 200:2000[SLEN]
+Theileria	18S	rrna	nuccore	25	250	85	Theileria[Organism] AND "18S ribosomal RNA"[Title] AND 1500:1900[SLEN]
+Theileria	cox1	protein	protein	20	50	55	Theileria[Organism] AND cox1[All Fields] AND 200:500[SLEN] ||| Theileria[Organism] AND "cytochrome c oxidase subunit I"[Protein Name]
+Theileria	cytb	protein	protein	20	50	55	Theileria[Organism] AND "cytochrome b"[Protein Name]
+Theileria	beta_tubulin	protein	protein	15	60	65	Theileria[Organism] AND "beta-tubulin"[Protein Name] ||| Theileria[Organism] AND "tubulin beta chain"[Protein Name]
+Cytauxzoon	18S	rrna	nuccore	20	250	85	Cytauxzoon[Organism] AND "18S ribosomal RNA"[Title] AND 1400:1900[SLEN] ||| Cytauxzoon[Organism] AND 18S[Title]
+Cytauxzoon	cox1	protein	protein	15	50	55	Cytauxzoon[Organism] AND "cytochrome c oxidase subunit I"[Protein Name] ||| Cytauxzoon[Organism] AND cox1[All Fields]
+Cytauxzoon	cytb	protein	protein	15	50	55	Cytauxzoon[Organism] AND "cytochrome b"[Protein Name] ||| Cytauxzoon[Organism] AND cytb[All Fields]
+Hepatozoon	18S	rrna	nuccore	25	250	85	Hepatozoon[Organism] AND "18S ribosomal RNA"[Title] AND 1400:2000[SLEN] ||| Hepatozoon[Organism] AND 18S[Title] AND 1000:2000[SLEN]
+Hepatozoon	cox1	protein	protein	15	50	55	Hepatozoon[Organism] AND "cytochrome c oxidase subunit I"[Protein Name] ||| Hepatozoon[Organism] AND cox1[All Fields]
+Hemolivia	18S	rrna	nuccore	20	250	85	Hemolivia[Organism] AND 18S[Title] ||| Hemolivia[Organism] AND "ribosomal RNA"[Title]
+Hemolivia	cox1	protein	protein	15	50	45	Hepatozoon[Organism] AND "cytochrome c oxidase subunit I"[Protein Name] ||| Adeleorina[Organism] AND "cytochrome c oxidase subunit I"[Protein Name]
+Trypanosoma	18S	rrna	nuccore	25	250	85	Trypanosoma[Organism] AND "18S ribosomal RNA"[Title] AND 1500:2400[SLEN]
+Trypanosoma	gGAPDH	protein	protein	15	60	60	Trypanosoma[Organism] AND "glyceraldehyde-3-phosphate dehydrogenase"[Protein Name] AND srcdb_refseq[PROP]
+Trypanosoma	cox1	protein	protein	15	50	50	Trypanosoma[Organism] AND "cytochrome c oxidase subunit I"[Protein Name]
+Nairoviridae	RdRp_L	protein	protein	25	60	25	("Dali Nairo tick virus 1"[Organism] OR "Huangpi Tick Virus 1"[Organism] OR "Taggert virus"[Organism] OR Orthonairovirus[Organism]) AND ("RNA-dependent RNA polymerase"[All Fields] OR "L protein"[All Fields]) ||| Nairoviridae[Organism] AND "RNA-dependent RNA polymerase"[Protein Name] AND srcdb_refseq[PROP]
+Nairoviridae	N	protein	protein	25	40	25	("Dali Nairo tick virus 1"[Organism] OR "Huangpi Tick Virus 1"[Organism] OR "Taggert virus"[Organism] OR Orthonairovirus[Organism]) AND ("nucleocapsid"[All Fields] OR "nucleoprotein"[All Fields]) ||| Nairoviridae[Organism] AND "nucleocapsid protein"[Protein Name]
+Nairoviridae	GPC	protein	protein	20	50	25	("Dali Nairo tick virus 1"[Organism] OR "Huangpi Tick Virus 1"[Organism] OR "Taggert virus"[Organism] OR Orthonairovirus[Organism]) AND glycoprotein[All Fields] ||| Nairoviridae[Organism] AND "glycoprotein"[Protein Name] AND srcdb_refseq[PROP]
+Phenuiviridae	RdRp_L	protein	protein	25	60	25	("Okutama tick virus"[Organism] OR "Dabieshan tick virus"[Organism] OR "Kaisodi virus"[Organism] OR Uukuvirus[Organism]) AND ("RNA-dependent RNA polymerase"[All Fields] OR "L protein"[All Fields]) ||| Phenuiviridae[Organism] AND "RNA-dependent RNA polymerase"[Protein Name] AND srcdb_refseq[PROP]
+Phenuiviridae	N	protein	protein	25	40	25	("Okutama tick virus"[Organism] OR "Dabieshan tick virus"[Organism] OR "Kaisodi virus"[Organism] OR Uukuvirus[Organism]) AND ("nucleocapsid"[All Fields] OR "nucleoprotein"[All Fields]) ||| Phenuiviridae[Organism] AND "nucleocapsid protein"[Protein Name]
+Phenuiviridae	GPC	protein	protein	20	50	25	("Okutama tick virus"[Organism] OR "Dabieshan tick virus"[Organism] OR "Kaisodi virus"[Organism] OR Uukuvirus[Organism]) AND glycoprotein[All Fields] ||| Phenuiviridae[Organism] AND "glycoprotein"[Protein Name] AND srcdb_refseq[PROP]
+Flaviviridae	polyprotein	protein	protein	20	60	30	Flaviviridae[Organism] AND polyprotein[Protein Name] AND srcdb_refseq[PROP]
+Flaviviridae	NS5_RdRp	protein	protein	20	60	30	Jingmenvirus[Organism] AND ("NS5"[All Fields] OR "RNA-dependent RNA polymerase"[All Fields]) ||| Flaviviridae[Organism] AND NS5[Protein Name] AND srcdb_refseq[PROP]
+Flaviviridae	NS3_hel	protein	protein	20	60	30	Jingmenvirus[Organism] AND ("NS3"[All Fields] OR helicase[All Fields]) ||| Flaviviridae[Organism] AND NS3[Protein Name] AND srcdb_refseq[PROP]
+Flaviviridae	VP1_glyco	protein	protein	20	50	25	Jingmenvirus[Organism] AND ("VP1"[All Fields] OR "glycoprotein"[All Fields]) ||| "Alongshan virus"[Organism] AND ("VP1"[All Fields] OR "glycoprotein"[All Fields])
+Flaviviridae	VP2_nucleo	protein	protein	20	40	25	Jingmenvirus[Organism] AND ("VP2"[All Fields] OR "nucleoprotein"[All Fields]) ||| "Alongshan virus"[Organism] AND VP2[All Fields]
+Chuviridae	RdRp_L	protein	protein	20	60	30	Chuviridae[Organism] AND "RNA-dependent RNA polymerase"[Protein Name] AND srcdb_refseq[PROP]
+Chuviridae	G	protein	protein	15	50	25	Chuviridae[Organism] AND "glycoprotein"[Protein Name] AND srcdb_refseq[PROP]
+Chuviridae	N	protein	protein	15	40	25	Chuviridae[Organism] AND "nucleoprotein"[Protein Name] AND srcdb_refseq[PROP] ||| Chuviridae[Organism] AND "nucleocapsid protein"[Protein Name]
+Rhabdoviridae	RdRp_L	protein	protein	25	60	25	("Huangpi Tick Virus 3"[Organism] OR Rhabdoviridae[Organism]) AND ("RNA-dependent RNA polymerase"[All Fields] OR "large protein"[All Fields]) ||| Rhabdoviridae[Organism] AND "RNA-dependent RNA polymerase"[Protein Name] AND srcdb_refseq[PROP]
+Rhabdoviridae	N	protein	protein	20	40	30	Rhabdoviridae[Organism] AND "nucleoprotein"[Protein Name] AND srcdb_refseq[PROP]
+Orthomyxoviridae	PB1	protein	protein	20	60	25	(Quaranjavirus[Organism] OR "Yanbian Ortho tick virus 1"[Organism] OR "Xiangxi Ortho tick virus 1"[Organism]) AND PB1[All Fields] ||| Orthomyxoviridae[Organism] AND "polymerase basic protein 1"[Protein Name]
+Orthomyxoviridae	PB2	protein	protein	15	60	30	Orthomyxoviridae[Organism] AND "polymerase basic protein 2"[Protein Name] ||| Quaranjavirus[Organism] AND PB2[All Fields]
+Orthomyxoviridae	NP	protein	protein	15	40	30	Orthomyxoviridae[Organism] AND "nucleoprotein"[Protein Name] AND srcdb_refseq[PROP]
+Reoviridae	RdRp_VP1	protein	protein	20	60	30	Reoviridae[Organism] AND "RNA-dependent RNA polymerase"[Protein Name] AND srcdb_refseq[PROP] ||| Reoviridae[Organism] AND VP1[Protein Name] AND srcdb_refseq[PROP]
+Peribunyaviridae	RdRp_L	protein	protein	20	60	30	Peribunyaviridae[Organism] AND "RNA-dependent RNA polymerase"[Protein Name] AND srcdb_refseq[PROP]
+Peribunyaviridae	N	protein	protein	15	40	30	Peribunyaviridae[Organism] AND "nucleocapsid protein"[Protein Name] AND srcdb_refseq[PROP] ||| Peribunyaviridae[Organism] AND "nucleoprotein"[Protein Name]

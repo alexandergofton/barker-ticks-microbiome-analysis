@@ -1,0 +1,57 @@
+# Curated list of genera commonly reported as DNA-extraction-kit / PCR-reagent
+# contaminants in low-biomass sequencing.
+#
+# SOURCES
+#   Salter SJ et al. (2014) BMC Biology 12:87
+#     "Reagent and laboratory contamination can critically impact
+#      sequence-based microbiome analyses"
+#   Eisenhofer R et al. (2019) Trends in Microbiology 27:105-117
+#     "Contamination in low microbial biomass microbiome studies"
+#
+# THIS TABLE IS ANNOTATION ONLY. No script filters on it. It exists so that
+# taxa can be flagged in report tables and coloured in prevalence plots, and so
+# that a reviewer can see which calls warrant scepticism. This study has no
+# extraction blanks, so contaminant status can never be resolved from the data
+# alone -- several of these genera are also genuine tick/environmental
+# associates. Edit freely; add a row to flag more, delete a row to unflag.
+#
+# confidence: high   = near-ubiquitous kitome taxon, treat with strong scepticism
+#             medium = frequently reported, but real environmental/host associations exist
+#             low    = context-dependent; flagged for awareness only
+genus	confidence	note
+Ralstonia	high	canonical kitome taxon (Salter 2014)
+Burkholderia	high	canonical kitome taxon; also genuine environmental
+Delftia	high	canonical kitome taxon
+Cupriavidus	high	canonical kitome taxon
+Bradyrhizobium	high	ultrapure water / column contaminant
+Herbaspirillum	high	canonical kitome taxon
+Variovorax	high	canonical kitome taxon
+Afipia	high	canonical kitome taxon
+Methylobacterium	high	canonical kitome taxon
+Sphingomonas	high	canonical kitome taxon; also environmental
+Stenotrophomonas	high	canonical kitome taxon
+Cutibacterium	high	skin/handling contaminant (formerly Propionibacterium)
+Propionibacterium	high	skin/handling contaminant
+Pseudomonas	medium	very common kitome taxon; also genuine tick-associated
+Acinetobacter	medium	common kitome taxon; also genuine environmental
+Massilia	medium	reported kitome taxon
+Janthinobacterium	medium	reported kitome taxon
+Novosphingobium	medium	reported kitome taxon
+Brevundimonas	medium	reported kitome taxon
+Achromobacter	medium	reported kitome taxon
+Chryseobacterium	medium	reported kitome taxon
+Flavobacterium	medium	reported kitome taxon; also environmental
+Comamonas	medium	reported kitome taxon
+Pelomonas	medium	reported kitome taxon
+Escherichia	medium	recombinant-enzyme carryover; also genuine gut taxon
+Shewanella	low	occasional reagent taxon
+Paenibacillus	low	soil/environmental; occasionally reagent. NOTE: dominates 0143-F1-Am-sp (~90%)
+Bacillus	low	soil/environmental; spore carryover
+Staphylococcus	low	handling contaminant; also genuine
+Streptococcus	low	handling contaminant; also genuine
+Corynebacterium	low	handling contaminant; also genuine
+Micrococcus	low	handling contaminant
+Microbacterium	low	reported kitome taxon
+Rhodococcus	low	reported kitome taxon
+Deinococcus	low	reported kitome taxon
+Lawsonella	low	skin-associated

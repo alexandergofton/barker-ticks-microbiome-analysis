@@ -1,0 +1,6 @@
+# Resolve inconsistent file stems to a single canonical sample_id.
+# Every script under code/analysis/ reads this. Files on disk are NEVER renamed.
+# Add a row whenever an artefact directory disagrees with the canonical id.
+file_stem	sample_id	found_in	note
+8334-AMLoculosum-BriddledTurn7	8334-AMLoculosum-BriddledTurn	lca	trailing "7" typo in the LCA filename only
+B6852_F1_38_1	B6852_F1_38_S1	contigs	missing "S" in the contigs filename only

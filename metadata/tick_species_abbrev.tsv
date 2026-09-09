@@ -1,0 +1,49 @@
+# Tick-species abbreviations appearing inside sample IDs -> a DRAFT species guess.
+#
+# THIS IS A GUESS, NOT AN IDENTIFICATION. It exists only to pre-populate the
+# metadata template so you have something to correct rather than 156 blank
+# cells. Anything derived from it is written to the `tick_species_guess` column
+# with tick_species_source = id_string_guess, and is superseded the moment the
+# collaborator's mitogenome identifications arrive.
+#
+# Matching is case-insensitive and longest-abbreviation-first, so "Bhydrosauri"
+# wins over any shorter prefix. Add rows freely; delete a row to stop guessing.
+abbrev	species_guess
+Bhydrosauri	Bothriocroton hydrosauri
+Bhydro	Bothriocroton hydrosauri
+Btachyglossi	Bothriocroton tachyglossi
+Btachyg	Bothriocroton tachyglossi
+Bconcolor	Bothriocroton concolor
+Bconcular	Bothriocroton concolor
+Bconc	Bothriocroton concolor
+Bundatum	Bothriocroton undatum
+Afimbriatum	Amblyomma fimbriatum
+Afimb	Amblyomma fimbriatum
+Alimbatum	Amblyomma limbatum
+Alimb	Amblyomma limbatum
+Atrig	Amblyomma triguttatum
+Amtrig	Amblyomma triguttatum
+Amoreliae	Amblyomma moreliae
+Amorelia	Amblyomma moreliae
+Aalbo	Amblyomma albolimbatum
+AMLoculosum	Amblyomma loculosum
+AmblyomaSP	Amblyomma sp.
+Am-sp	Amblyomma sp.
+Hhumerosa	Haemaphysalis humerosa
+Hhum	Haemaphysalis humerosa
+Hbanc	Haemaphysalis bancrofti
+HbanKI	Haemaphysalis bancrofti
+Hban	Haemaphysalis bancrofti
+Iholo	Ixodes holocyclus
+Ifecialis	Ixodes fecialis
+Iornithorhynchi	Ixodes ornithorhynchi
+Iorni	Ixodes ornithorhynchi
+Itasm	Ixodes tasmani
+Iconf	Ixodes confusus
+Isimp	Ixodes simplex
+Apersicus	Argas persicus
+Argusrobertsi	Argas robertsi
+Argasidae	Argasidae sp.
+Argus	Argas sp.
+Ixodes	Ixodes sp.
+Cryptocroton	Cryptocroton sp.

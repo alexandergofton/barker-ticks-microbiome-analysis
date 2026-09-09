@@ -1,0 +1,136 @@
+# Analysis parameters for the Barker tick microbiome/pathogen export.
+# Every script under code/analysis/ reads this file. Change values here, not in code.
+
+project:
+  name: barker_ticks_microbiome
+  root: /data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis
+  # Framing: no extraction blanks or no-template controls exist in this experiment.
+  # Composition is reported descriptively. Contaminant taxa are ANNOTATED, never removed.
+  design: descriptive_observational_no_controls
+
+paths:
+  lca_dir:        lca
+  mapping_dir:    mapping
+  contigs_dir:    contigs
+  blast_dir:      blast
+  taxdump_dir:    taxdump
+  kraken2_dir:    ../kraken2
+  results_dir:    results
+
+# ---------------------------------------------------------------------------
+# Contig-level evidence filter. Applied BEFORE TPM renormalisation.
+#
+# Rationale: TPM divides by contig length, so short thinly-covered contigs are
+# handed a disproportionate share of the TPM budget. Measured on 0143-F1-Am-sp,
+# LCA-assigned contigs hold 95.4% of mapped READS but only 60.3% of TPM mass --
+# the unassigned remainder is short-contig assembly noise. These floors remove it.
+# ---------------------------------------------------------------------------
+contig_filter:
+  min_contig_len:     300     # bp
+  min_mapped_reads:   10      # reads on the contig
+  min_top_bitscore:   100     # LCA already applied evalue <= 1e-5
+
+# Per-sample detection thresholds for calling a taxon PRESENT.
+# TPM alone never makes a call -- read and contig evidence must clear these too.
+taxon_filter:
+  min_contigs_per_taxon: 1
+  min_reads_per_taxon:   50
+
+# Alternative settings reported side-by-side in tables/filter_sensitivity.tsv
+sensitivity_profiles:
+  lenient:
+    min_contig_len: 0
+    min_mapped_reads: 0
+    min_top_bitscore: 0
+    min_contigs_per_taxon: 1
+    min_reads_per_taxon: 0
+  default:
+    min_contig_len: 300
+    min_mapped_reads: 10
+    min_top_bitscore: 100
+    min_contigs_per_taxon: 1
+    min_reads_per_taxon: 50
+  strict:
+    min_contig_len: 1000
+    min_mapped_reads: 50
+    min_top_bitscore: 200
+    min_contigs_per_taxon: 2
+    min_reads_per_taxon: 200
+
+# ---------------------------------------------------------------------------
+# Taxonomic scope. Host and bloodmeal are split out, not discarded.
+# ---------------------------------------------------------------------------
+scope:
+  host_phyla:        [Arthropoda]        # the tick itself
+  bloodmeal_phyla:   [Chordata]          # vertebrate host DNA in the bloodmeal
+  # microbial = Bacteria + Archaea + Viruses + (Eukaryota minus Metazoa minus Viridiplantae)
+  exclude_euk_kingdoms: [Metazoa, Viridiplantae]
+  ranks_to_export:   [species, genus, family, phylum]
+  primary_rank:      species
+
+lca_run:
+  evalue:      1.0e-5
+  pident:      0.0
+  top_percent: 10.0
+
+diversity:
+  clr_pseudocount: 1.0
+  permanova_terms: [tick_species, life_stage, state, flowcell, lane]
+  permanova_permutations: 999
+
+# ---------------------------------------------------------------------------
+# Phylogenetic marker gene extraction (code/analysis/11..16, run_markers.sh).
+#
+# The panel itself lives in metadata/target_markers.tsv -- one row per
+# target x marker. This section only holds the search and extraction settings.
+#
+# SCOPE: extraction runs over EVERY contig in
+# results/targets/target_contig_index.tsv, including samples that fall below
+# the presence call in target_prevalence.tsv. A recovered marker gene is itself
+# detection evidence, so pre-filtering on read counts would discard real
+# detections. The presence call and evidence tier travel with every extracted
+# sequence as annotation instead.
+# ---------------------------------------------------------------------------
+markers:
+  panel:            metadata/target_markers.tsv
+  out_dir:          results/markers
+
+  # Reference sequences are fetched from NCBI Entrez ONCE and cached. They are
+  # used only to LOCATE and ORIENT each locus in the contigs -- they are not the
+  # reference set for your trees, which you add by hand after alignment.
+  refs:
+    email:          alexander.gofton@gmail.com   # Entrez requires a contact
+    api_key_env:    NCBI_API_KEY                 # optional; raises the rate limit
+    max_seq_len:    30000        # skip whole-genome records returned by a loose query
+    min_refs_ok:    1            # below this the row is reported as UNRESOLVED
+
+  search:
+    threads:           8
+    evalue_rrna:       1e-20
+    evalue_protein:    1e-10
+    # HSPs for one reference against one contig are merged into a single locus
+    # when they are closer than this on the contig. Proteins get the larger gap
+    # because tblastn breaks a gene across HSPs at low identity.
+    merge_gap_rrna:    500
+    merge_gap_protein: 3000
+    # Two loci of DIFFERENT markers overlapping on the same contig by more than
+    # this fraction are resolved competitively -- highest bitscore wins. This is
+    # what stops the Rickettsia Sca-family paralogues (ompA / ompB / sca4) from
+    # each claiming the same region.
+    paralog_overlap:   0.50
+    max_loci_per_contig_marker: 3
+
+  extract:
+    min_locus_len_nt:  200       # floor on the extracted sequence, on top of the
+                                 # per-marker min_aln_len in the panel table
+    flank_rrna:        50        # bp of context added either side of an rRNA hit
+    flank_protein:     0         # none: the span must stay in frame
+
+  align:
+    tool:              mafft     # mafft | muscle
+    mafft_opts:        --auto --maxiterate 1000
+    mafft_rrna_opts:   --auto --adjustdirection --maxiterate 1000
+    min_seqs_to_align: 2
+    # Protein-coding loci are aligned as amino acids and back-translated to a
+    # codon-preserving nucleotide alignment; both are written out.
+    codon_aware:       true

@@ -1,0 +1,168 @@
+sample_id	status	tick_species	tick_species_source	life_stage	n_ticks_pooled	host_species	collection_site	state	latitude	longitude	collection_date	dna_conc_ng_ul	extraction_batch	notes	tick_species_guess	matched_abbrev	life_stage_guess	n_ticks_guess	flowcell	index_i7	index_i5	lane	seq_run	sample_sheet_index	seq_submission
+0143-F1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	female	1	22KM2TLT3	ATTGCGCGGT	TTGGCTCCGC	L008	22KM2TLT3_L008		flowcell_indexed
+0542-Hhumerosa-2F-2M-NT	complete		id_string_guess												Haemaphysalis humerosa	Hhumerosa	mixed	4	22N3FNLT3	ACGCCTTGTT	TAAGGAACGT	L004	22N3FNLT3_L004		flowcell_indexed
+0643-M1-2-Bhydro	complete		id_string_guess												Bothriocroton hydrosauri	Bhydro	male	1	22KM2TLT3	TAATGTGTCT	GTAAGGCATA	L008	22KM2TLT3_L008		flowcell_indexed
+0890-TI-	complete																		22KM2TLT3	TATGCCTTAC	AGACACATTA	L008	22KM2TLT3_L008		flowcell_indexed
+0895-N1-7-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	nymph	1	22KM2TLT3	AACACTGTTA	GCAAGTCTCA	L008	22KM2TLT3_L008		flowcell_indexed
+0969-Hhumerosa-5M-1F	complete		id_string_guess												Haemaphysalis humerosa	Hhumerosa	mixed	6	22N3FNLT3	TAAGCATCCA	TCAATCCATT	L004	22N3FNLT3_L004		flowcell_indexed
+2162-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	ACTCTATTGT	ATCGCATATG	L008	22KM2TLT3_L008		flowcell_indexed
+2290-M1-2-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	ACGGTCAGGA	CGGCCTCGTT	L008	22KM2TLT3_L008		flowcell_indexed
+2331-Apersicus	complete		id_string_guess												Argas persicus	Apersicus			22KM2TLT3	CCTGTCTGTC	ACTGTTGTGA	L008	22KM2TLT3_L008		flowcell_indexed
+2719-F1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	female	1	22KM2TLT3	GGTTGCGAGG	AATAGAGCAA	L008	22KM2TLT3_L008		flowcell_indexed
+2722-M1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	male	1	22KM2TLT3	GTGCAGACAG	TACCATCCGT	L008	22KM2TLT3_L008		flowcell_indexed
+2725-1L-2012-ButcherBird	complete																larva	1	22N3FNLT3	GACTGAGTAG	GTTGATAGTG	L004	22N3FNLT3_L004		flowcell_indexed
+3095-Bconc	complete		id_string_guess												Bothriocroton concolor	Bconc			22KM2TLT3	TATTGCGCTC	CTGTGTTAGG	L008	22KM2TLT3_L008		flowcell_indexed
+3263	complete																		22N3FNLT3	ACCGGCCGTA	TGGCAATATT	L004	22N3FNLT3_L004		flowcell_indexed
+4026-BothricrotonSp-5M	complete																male	5	22N3FNLT3	ACCACGACAT	TCGTATGCGG	L004	22N3FNLT3_L004		flowcell_indexed
+4118-Hhumerosa-1F-BoyneIs-Wrinkled	complete		id_string_guess												Haemaphysalis humerosa	Hhumerosa	female	1	22N3FNLT3	ATTCCATAAG	TGCCTGGTGG	L004	22N3FNLT3_L004		flowcell_indexed
+4479-N1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	nymph	1	22KM2TLT3	CTGTTGGTCC	ATAGACCGTT	L008	22KM2TLT3_L008		flowcell_indexed
+4480-F1-Isimp	complete		id_string_guess												Ixodes simplex	Isimp	female	1	22KM2TLT3	TGGCTAATCA	AGGCATGTAG	L008	22KM2TLT3_L008		flowcell_indexed
+4904-M1Aalbo	complete		id_string_guess												Amblyomma albolimbatum	Aalbo			22KM2TLT3	GTGACACGCA	GCTTACGGAC	L008	22KM2TLT3_L008		flowcell_indexed
+4908-N1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	nymph	1	22KM2TLT3	TCCATTGCCG	GAATGCACGA	L008	22KM2TLT3_L008		flowcell_indexed
+4995-Argus	complete		id_string_guess												Argas sp.	Argus			22KM2TLT3	CAGTGGCACT	TAACAATAGG	L008	22KM2TLT3_L008		flowcell_indexed
+5070-847-DECB-ParkhurstHbanc	complete		id_string_guess												Haemaphysalis bancrofti	Hbanc			22KM2TLT3	GTCCTGGATA	CGGTGGCGAA	L008	22KM2TLT3_L008		flowcell_indexed
+5121-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	GGCAAGCCAG	CAAGCATCCG	L008	22KM2TLT3_L008		flowcell_indexed
+6226-S099Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig			22KM2TLT3	TGGTACCTAA	CATGAGTACT	L008	22KM2TLT3_L008		flowcell_indexed
+627	complete																		22KM2TLT3	TCTATCCTAA	CGTCGACTGG	L008	22KM2TLT3_L008		flowcell_indexed
+6587-0561-MAR-J-BtachyEF	complete																		22KM2TLT3	CTCGCTTCGG	TACTAGTCAA	L008	22KM2TLT3_L008		flowcell_indexed
+6700-10-CT-Hbanc	complete		id_string_guess												Haemaphysalis bancrofti	Hbanc			22KM2TLT3	AGAGGCAACC	CTAATGATGG	L008	22KM2TLT3_L008		flowcell_indexed
+6850-1-Hhum-Half-ptDouglas	complete		id_string_guess												Haemaphysalis humerosa	Hhum			22N3FNLT3	GTGACACGCA	GCTTACGGAC	L004	22N3FNLT3_L004		flowcell_indexed
+6850-2-Hhum-1M-PtDouglas	complete		id_string_guess												Haemaphysalis humerosa	Hhum	male	1	22N3FNLT3	CGACATCCGA	TACGTTCATT	L004	22N3FNLT3_L004		flowcell_indexed
+6868-Bconc-3F-GlennInnes	complete		id_string_guess												Bothriocroton concolor	Bconc	female	3	22N3FNLT3	AGTCAGACGA	ACCAGCGACA	L004	22N3FNLT3_L004		flowcell_indexed
+766	complete																		22KM2TLT3	TGATGTAAGA	GTGCGTCCTT	L008	22KM2TLT3_L008		flowcell_indexed
+8016	complete																		22KM2TLT3	ATTCCATAAG	TGCCTGGTGG	L008	22KM2TLT3_L008		flowcell_indexed
+8016-F1-Iorni	complete		id_string_guess												Ixodes ornithorhynchi	Iorni	female	1	22KM2TLT3	CTTGCCATTA	ATCACGAAGG	L008	22KM2TLT3_L008		flowcell_indexed
+8050-M1	complete																male	1	22KM2TLT3	GAACTGAGCG	TCGTGGAGCG	L008	22KM2TLT3_L008		flowcell_indexed
+8130-M1-2-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	male	1	22KM2TLT3	CGGTTACGGC	AAGACTATAG	L008	22KM2TLT3_L008		flowcell_indexed
+8131-N1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	nymph	1	22KM2TLT3	GCAACATGGA	CTTGTCTTAA	L008	22KM2TLT3_L008		flowcell_indexed
+8136B-N1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	nymph	1	22KM2TLT3	ATACCAACGC	AATTGCTGCG	L008	22KM2TLT3_L008		flowcell_indexed
+8137-N1-2-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	nymph	1	22KM2TLT3	ACGCCTTGTT	TAAGGAACGT	L008	22KM2TLT3_L008		flowcell_indexed
+8138-M1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	male	1	22KM2TLT3	CGACATCCGA	TACGTTCATT	L008	22KM2TLT3_L008		flowcell_indexed
+8140-A-M1Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb			22KM2TLT3	GTCTAATGGC	AGTGGTCAGG	L008	22KM2TLT3_L008		flowcell_indexed
+8140-B-M1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	male	1	22KM2TLT3	CTAGTGCTCT	TGGAACAGTA	L008	22KM2TLT3_L008		flowcell_indexed
+8141-Bconcolor-2F	complete		id_string_guess												Bothriocroton concolor	Bconcolor	female	2	22N3FNLT3	GGTTGCGAGG	AATAGAGCAA	L004	22N3FNLT3_L004		flowcell_indexed
+8143	complete																		22KM2TLT3	CCGTATGTTC	CATACACTGT	L008	22KM2TLT3_L008		flowcell_indexed
+8145-Bconcular-1F	complete		id_string_guess												Bothriocroton concolor	Bconcular	female	1	22N3FNLT3	AGAGGCAACC	CTAATGATGG	L004	22N3FNLT3_L004		flowcell_indexed
+8150-M1	complete																male	1	22KM2TLT3	CACAATAGGA	TCCATCCGAG	L008	22KM2TLT3_L008		flowcell_indexed
+8164-M1-Amorelia	complete		id_string_guess												Amblyomma moreliae	Amorelia	male	1	22KM2TLT3	CCATCATTAG	GGTTGCCTCT	L008	22KM2TLT3_L008		flowcell_indexed
+8166-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp			22KM2TLT3	TTCTACATAC	CTAACTGTAA	L008	22KM2TLT3_L008		flowcell_indexed
+8168A-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	TACGAGTCCA	TAGCGAAGCA	L008	22KM2TLT3_L008		flowcell_indexed
+8174-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	TCTCATGATA	AACACGTGGA	L008	22KM2TLT3_L008		flowcell_indexed
+8177	complete																		22KM2TLT3	TGATTATACG	GTCGATTACA	L008	22KM2TLT3_L008		flowcell_indexed
+8178B-M1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	male	1	22KM2TLT3	TGGCGCGAAC	AACTGATACT	L008	22KM2TLT3_L008		flowcell_indexed
+8180-F1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	female	1	22KM2TLT3	ACCGGCCGTA	TGGCAATATT	L008	22KM2TLT3_L008		flowcell_indexed
+8182-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb			22KM2TLT3	GCGTGGATGG	TTGACCAATG	L008	22KM2TLT3_L008		flowcell_indexed
+8184-F1-N1-3-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	mixed	2	22KM2TLT3	CTATTACTAC	GAGTCTCTCC	L008	22KM2TLT3_L008		flowcell_indexed
+8186-M1-F1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	mixed	2	22KM2TLT3	CGAGGCCAAG	GTGTTACCGG	L008	22KM2TLT3_L008		flowcell_indexed
+8187-F1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	female	1	22KM2TLT3	CCAAGGCCTT	TCGAAGTACT	L008	22KM2TLT3_L008		flowcell_indexed
+8188-M2-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	male	2	22KM2TLT3	CACGGAACAA	AACCTAGCAC	L008	22KM2TLT3_L008		flowcell_indexed
+8202-F1-Cpapua	complete																female	1	22KM2TLT3	AGTCAGACGA	ACCAGCGACA	L008	22KM2TLT3_L008		flowcell_indexed
+8208	complete																		22KM2TLT3	GAAGCGGCAC	CGGCTCTACT	L008	22KM2TLT3_L008		flowcell_indexed
+8220-F1	complete																female	1	22KM2TLT3	CGTTATTCTA	CCATAAGGTT	L008	22KM2TLT3_L008		flowcell_indexed
+8223	complete																		22KM2TLT3	AGGATGTGCT	TTACAATTCC	L008	22KM2TLT3_L008		flowcell_indexed
+8225-3L1	complete																		22KM2TLT3	GACACCATGT	TCAACGTGTA	L008	22KM2TLT3_L008		flowcell_indexed
+8241-N1	complete																nymph	1	22KM2TLT3	GAGTCATAGG	GTGTGGCGCT	L008	22KM2TLT3_L008		flowcell_indexed
+8244-A-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	CCATCTCGCC	TTCTATGGTT	L008	22KM2TLT3_L008		flowcell_indexed
+8249-F1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	female	1	22KM2TLT3	TCTGGTATCC	CGTTGCTTAC	L008	22KM2TLT3_L008		flowcell_indexed
+8251-F1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	female	1	22KM2TLT3	TGTCGCTGGT	TCGTCTGACT	L008	22KM2TLT3_L008		flowcell_indexed
+8253-M1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	male	1	22KM2TLT3	TTCACGAGAC	AGATTGTTAC	L008	22KM2TLT3_L008		flowcell_indexed
+8255-M1-Am-trig-rosei	complete																male	1	22KM2TLT3	GATAGGCCGA	CGCACATGGC	L008	22KM2TLT3_L008		flowcell_indexed
+8256-F1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	female	1	22KM2TLT3	ACCGTTACAA	CTCATAGCGA	L008	22KM2TLT3_L008		flowcell_indexed
+8260-F1-Iconf	complete		id_string_guess												Ixodes confusus	Iconf	female	1	22KM2TLT3	CAGCCGCGTA	ACTAGCCGTG	L008	22KM2TLT3_L008		flowcell_indexed
+8261-F1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	female	1	22KM2TLT3	ATGGTTGACT	GGCCTGTCCT	L008	22KM2TLT3_L008		flowcell_indexed
+8261-M1-3-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	male	1	22KM2TLT3	CCACCAGGCA	CTTATGGAAT	L008	22KM2TLT3_L008		flowcell_indexed
+8267	complete																		22N3FNLT3	TGATTATACG	GTCGATTACA	L004	22N3FNLT3_L004		flowcell_indexed
+8275-F1	complete																female	1	22KM2TLT3	GAGAATGGTT	TCGGCAGCAA	L008	22KM2TLT3_L008		flowcell_indexed
+8278-F1-Itasm	complete		id_string_guess												Ixodes tasmani	Itasm	female	1	22KM2TLT3	AGGTCAGATA	CTACAAGATA	L008	22KM2TLT3_L008		flowcell_indexed
+8279	complete																		22N3FNLT3	CAGCCGCGTA	ACTAGCCGTG	L004	22N3FNLT3_L004		flowcell_indexed
+8286	complete																		22KM2TLT3	GATCAAGGCA	CCTTGTTAAT	L008	22KM2TLT3_L008		flowcell_indexed
+8286-F1-Itasm	complete		id_string_guess												Ixodes tasmani	Itasm	female	1	22KM2TLT3	AACATCGCGC	GTCCACTTGT	L008	22KM2TLT3_L008		flowcell_indexed
+8289-Emmureville-EF1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig			22KM2TLT3	GCCGCACTCT	TCCGACCTCG	L008	22KM2TLT3_L008		flowcell_indexed
+8294-Goomburra-Hbanc	complete		id_string_guess												Haemaphysalis bancrofti	Hbanc			22KM2TLT3	GACTGAGTAG	GTTGATAGTG	L008	22KM2TLT3_L008		flowcell_indexed
+8302-Argusrobertsi	complete		id_string_guess												Argas robertsi	Argusrobertsi			22KM2TLT3	TAAGCATCCA	TCAATCCATT	L008	22KM2TLT3_L008		flowcell_indexed
+8311-Ifecialis-F-MtWIndsor	complete		id_string_guess												Ixodes fecialis	Ifecialis			22N3FNLT3	ATGGTTGACT	GGCCTGTCCT	L004	22N3FNLT3_L004		flowcell_indexed
+8316-B-F1-AmblyomaSP	complete		id_string_guess												Amblyomma sp.	AmblyomaSP	female	1	22N3FNLT3	TATTGCGCTC	CTGTGTTAGG	L004	22N3FNLT3_L004		flowcell_indexed
+8334-AMLoculosum-BriddledTurn	complete		id_string_guess												Amblyomma loculosum	AMLoculosum			22N3FNLT3	CACAATAGGA	TCCATCCGAG	L004	22N3FNLT3_L004		flowcell_indexed
+8336-Argasidae-4L-Boobie	complete		id_string_guess												Argasidae sp.	Argasidae	larva	4	22N3FNLT3	GAGTCATAGG	GTGTGGCGCT	L004	22N3FNLT3_L004		flowcell_indexed
+8337-Iholo-Xbtp-Awzh	complete		id_string_guess												Ixodes holocyclus	Iholo			22N3FNLT3	CGGTTACGGC	AAGACTATAG	L004	22N3FNLT3_L004		flowcell_indexed
+8352-F1-Amoreliae	complete		id_string_guess												Amblyomma moreliae	Amoreliae	female	1	22N3FNLT3	CCACCAGGCA	CTTATGGAAT	L004	22N3FNLT3_L004		flowcell_indexed
+8354-M1-Amoreliae	complete		id_string_guess												Amblyomma moreliae	Amoreliae	male	1	22N3FNLT3	AACATCGCGC	GTCCACTTGT	L004	22N3FNLT3_L004		flowcell_indexed
+8356A-Amoreliae	complete		id_string_guess												Amblyomma moreliae	Amoreliae			22N3FNLT3	CTTGCCATTA	ATCACGAAGG	L004	22N3FNLT3_L004		flowcell_indexed
+8356B-Bundatum	complete		id_string_guess												Bothriocroton undatum	Bundatum			22N3FNLT3	GAGAATGGTT	TCGGCAGCAA	L004	22N3FNLT3_L004		flowcell_indexed
+8357-Amoreliae	complete		id_string_guess												Amblyomma moreliae	Amoreliae			22N3FNLT3	CCATCATTAG	GGTTGCCTCT	L004	22N3FNLT3_L004		flowcell_indexed
+8368-Afimbriatum-2M-MtCarbine	complete		id_string_guess												Amblyomma fimbriatum	Afimbriatum	male	2	22N3FNLT3	ACAGTGTATG	GAACATACGG	L004	22N3FNLT3_L004		flowcell_indexed
+8378-Alimbatum-1F-3M-DescarteIs	complete		id_string_guess												Amblyomma limbatum	Alimbatum	mixed	4	22N3FNLT3	GCCGCACTCT	TCCGACCTCG	L004	22N3FNLT3_L004		flowcell_indexed
+8381-T9571-Aalbo-F	complete		id_string_guess												Amblyomma albolimbatum	Aalbo			22N3FNLT3	GAACTGAGCG	TCGTGGAGCG	L004	22N3FNLT3_L004		flowcell_indexed
+8391-Hhumerosa-1M-BliBli	complete		id_string_guess												Haemaphysalis humerosa	Hhumerosa	male	1							unknown
+8392-18-4-24-Amoreliae-1F	complete		id_string_guess												Amblyomma moreliae	Amoreliae	female	1	22N3FNLT3	TTCTACATAC	CTAACTGTAA	L004	22N3FNLT3_L004		flowcell_indexed
+8394-Btachyg-2M-5Legs-EastEnd	complete		id_string_guess												Bothriocroton tachyglossi	Btachyg	male	2	22N3FNLT3	CCGTATGTTC	CATACACTGT	L004	22N3FNLT3_L004		flowcell_indexed
+8395-Btachyg-2M-3Legs-Damscus	complete		id_string_guess												Bothriocroton tachyglossi	Btachyg	male	2							unknown
+8398-Booyal-3-H-B-F	complete																								unknown
+8399-F-Benaraby-M-gig-14-4-24	excluded_no_blast																		22N3FNLT3	CTAGTGCTCT	TGGAACAGTA	L004	22N3FNLT3_L004		flowcell_indexed
+8401-Hban-1F-Farnborough	complete		id_string_guess												Haemaphysalis bancrofti	Hban	female	1	22N3FNLT3	GATAGGCCGA	CGCACATGGC	L004	22N3FNLT3_L004		flowcell_indexed
+8404-Amtrig-M-EtnaCk	complete		id_string_guess												Amblyomma triguttatum	Amtrig			22N3FNLT3	GAAGCGGCAC	CGGCTCTACT	L004	22N3FNLT3_L004		flowcell_indexed
+8405-Bhydrosauri-1F-VIC	complete		id_string_guess												Bothriocroton hydrosauri	Bhydrosauri	female	1	22N3FNLT3	AACCATAGAA	GGCGAGATGG	L004	22N3FNLT3_L004		flowcell_indexed
+Af_P27_F1_S38	complete																female	1						38	sheet_indexed
+B0512_F1_34_7_S16	complete																female	1						16	sheet_indexed
+B1201_M1_1_96_S24	complete																male	1						24	sheet_indexed
+B2490_F1_74_9_S2	complete																female	1						2	sheet_indexed
+B3015_F1_0_49_S28	complete																female	1						28	sheet_indexed
+B3199_F2_S1	excluded_no_reads																female	2						1	sheet_indexed
+B3648_M1_14_8_S19	complete																male	1						19	sheet_indexed
+B4092_F1_28_3_S15	complete																female	1						15	sheet_indexed
+B4276_F1_28_7_S20	complete																female	1						20	sheet_indexed
+B4283_M1_S2	complete																male	1						2	sheet_indexed
+B4559_F1_S3	complete																female	1						3	sheet_indexed
+B4560b_F1_S5	complete																female	1						5	sheet_indexed
+B4926_F1_S12	complete																female	1						12	sheet_indexed
+B4952_F1_S6	complete																female	1						6	sheet_indexed
+B5053a_N1_1_14_S10	complete																nymph	1						10	sheet_indexed
+B5056b_F1_S7	excluded_no_blast																female	1						7	sheet_indexed
+B5088_F2_S16	complete																female	2						16	sheet_indexed
+B5093_F2_S8	complete																female	2						8	sheet_indexed
+B5119_F1_S15	complete																female	1						15	sheet_indexed
+B5303_F1_S11	complete																female	1						11	sheet_indexed
+B6565_F1_1_03_S13	complete																female	1						13	sheet_indexed
+B6658_L1_15_S25	complete																larva	1						25	sheet_indexed
+B6745_F1_S9	complete																female	1						9	sheet_indexed
+B6813b_F1_S10	complete																female	1						10	sheet_indexed
+B6836_N1_S13	complete																nymph	1						13	sheet_indexed
+B6837_F1_S14	complete																female	1						14	sheet_indexed
+B6841_2_F1_S29	complete																female	1						29	sheet_indexed
+B6852_F1_38_S1	complete																female	1						1	sheet_indexed
+B6859_M1_25_9_S4	complete																male	1						4	sheet_indexed
+B6876_1_M1_S25	complete																male	1						25	sheet_indexed
+B6882_M1_S20	excluded_no_reads																male	1						20	sheet_indexed
+B6894_F1_0_913_S23	complete																female	1						23	sheet_indexed
+B6922_F1_S28	complete																female	1						28	sheet_indexed
+B6923_F1_20_2_S12	complete																female	1						12	sheet_indexed
+B7001.3.F1	excluded_no_reads																female	1							unknown
+B7001_N1_S19	excluded_no_reads																nymph	1						19	sheet_indexed
+B7002_1_F1_5_22_S9	complete																female	1						9	sheet_indexed
+B7004_M2_S17	excluded_no_reads																male	2						17	sheet_indexed
+B7009_F1_S31	complete																female	1						31	sheet_indexed
+B7014_F2_21_3_S7	complete																female	2						7	sheet_indexed
+B7015_F1_S18	complete																female	1						18	sheet_indexed
+B7017_M2_S22	complete																male	2						22	sheet_indexed
+B7024_M1_21_2_S11	needs_mapping																male	1						11	sheet_indexed
+B7025_M1_S23	complete																male	1						23	sheet_indexed
+B7103.F1.Cryptocroton	complete		id_string_guess												Cryptocroton sp.	Cryptocroton	female	1							unknown
+B7106_F1_S21	complete																female	1						21	sheet_indexed
+B7111.N1.Ixodes	excluded_no_reads		id_string_guess												Ixodes sp.	Ixodes	nymph	1							unknown
+B7114_F1	excluded_no_reads																female	1							unknown
+B7115_N3_S40	complete																nymph	3						40	sheet_indexed
+B7115_N5_S41	complete																nymph	5						41	sheet_indexed
+B7116_N3_8_78_S8	complete																nymph	3						8	sheet_indexed
+B7119_F1_5_34_S5	complete																female	1						5	sheet_indexed
+B7139.F1.Btachyglossi	excluded_no_reads		id_string_guess												Bothriocroton tachyglossi	Btachyglossi	female	1							unknown
+B7203_N1_B3644_S26	complete																nymph	1						26	sheet_indexed
+B7217_F1_8_44_S22	complete																female	1						22	sheet_indexed
+B7229_F1_11_1_S17	complete																female	1						17	sheet_indexed
+B7285_F2_14_3_S14	complete																female	2						14	sheet_indexed
+B7380_F1_34_S21	complete																female	1						21	sheet_indexed
+B7382_N1_2_03_S18	complete																nymph	1						18	sheet_indexed
+G288.F.HbanKI	excluded_no_reads		id_string_guess												Haemaphysalis bancrofti	HbanKI									unknown
+HannaHTBLD-Ixodes-sp	complete		id_string_guess												Ixodes sp.	Ixodes			22KM2TLT3	TTACCTGGAA	ACAGTTCCAG	L008	22KM2TLT3_L008		flowcell_indexed
+Oguryn1	complete																		22KM2TLT3	ACTGGATCTA	TCGCCGCTAG	L008	22KM2TLT3_L008		flowcell_indexed
+Oguryn2	complete																		22KM2TLT3	ACCACGACAT	TCGTATGCGG	L008	22KM2TLT3_L008		flowcell_indexed
+S109726-M1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	male	1	22KM2TLT3	CATTAGTGCG	TGACTACATA	L008	22KM2TLT3_L008		flowcell_indexed

@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Raw/intermediate data and per-sample outputs -- large, regenerable from
+# run_all.sh / run_markers.sh, and far too big for git (contigs/ alone is 70GB,
+# QC/ and blast/ are hundreds of GB each). Only code, config, metadata and docs
+# are tracked; see README_analysis.md and README_markers.md for how to
+# regenerate everything under these paths.
+taxdump/
+repaired_QC/
+reads_with_missing_contigs/
+QC/
+mapping/
+lca/
+contigs/
+contigs_with_missing_reads/
+blast/
+extracting_pathogens/
+results/
+
+# Conda envs are recreated from env/*.yml, not stored
+env/*/
+
+# Bulky run logs -- not source, not needed to reproduce
+logs/
+code/logs/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
