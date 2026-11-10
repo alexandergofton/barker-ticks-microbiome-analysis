@@ -1,0 +1,16 @@
+# Decisions on `review` items from results/audit/metadata_import_issues.tsv.
+# Read by code/analysis/05b_import_metadata.py, which marks a matching
+# (sample_id, field) issue `resolved`. This file records WHY; any value change
+# is made in barker_microbe_analysis_metadata.csv itself.
+sample_id	field	decision	date	evidence
+2162-M1-Alimb	tick_species	keep Amblyomma moreliae (id string 'Alimb' is wrong)	2026-11-10	mitogenome 8.4% p-distance from A. limbatum ref OR416215 and limbatum-labelled samples, 2.7-3.1% from moreliae-labelled samples; divergent within the moreliae group (12 genes)
+2719-F1-Alimb	tick_species	keep Amblyomma moreliae (id string 'Alimb' is wrong)	2026-11-10	mitogenome 0.76-0.88% from moreliae-labelled samples, 8.2% from A. limbatum ref OR416215
+8174-M1-Alimb	tick_species	keep Amblyomma moreliae (id string 'Alimb' is wrong)	2026-11-10	mitogenome 0.20-0.82% from moreliae-labelled samples, 8.2% from A. limbatum ref OR416215
+8394-Btachyg-2M-5Legs-EastEnd	tick_species	Bothriocroton hydrosauri (user re-identification; id string 'Btachyg' is wrong)	2026-11-10	CSV edited by user 2026-10-19; user confirms identification
+8395-Btachyg-2M-3Legs-Damscus	tick_species	Bothriocroton hydrosauri (user re-identification; id string 'Btachyg' is wrong)	2026-11-10	CSV edited by user 2026-10-19; user confirms identification
+8141-Bconcolor-2F	tick_species	Bothriocroton spratti (user re-identification; id string 'Bconcolor' is wrong)	2026-11-10	CSV edited by user 2026-10-19; user confirms identification
+B7139.F1.Btachyglossi	tick_species	Bothriocroton dahlbergi (user re-identification; id string 'Btachyglossi' is wrong)	2026-11-10	CSV edited by user 2026-10-19; user confirms identification
+8186-M1-F1-Afimb	tick_species	keep Amblyomma triguttatum (id string 'Afimb' is wrong)	2026-11-10	mitogenome 0.00-0.83% from 17 triguttatum-labelled samples, 22.7-23.6% from fimbriatum-labelled samples; nuclear rRNA 97.6% Amblyomma. Note: mito contig identical (0.00%, 9099 bp) to 8253-M1-Atrig on the same lane
+8244-A-M1-Alimb	tick_species	keep Amblyomma fimbriatum (id string 'Alimb' is wrong)	2026-11-10	mitogenome (14.8 kb, 184x) 0.15% and 0.56% from NT Top End fimbriatum 8180/8182, 5.6% from fimbriatum ref NC_017759, 24.4% from limbatum ref OR416215; nuclear rRNA 100% Amblyomma
+8275-F1	latitude/longitude	genuine Falklands sample (coords = Pebble Island); EXCLUDED from the study as out of scope, see excluded_samples.tsv	2026-11-10	I. uriae mitogenome 6.4% from ref NC_006078, >=18% from every Australian Ixodes; nuclear rRNA 99.99% Ixodes; host and site consistent with I. uriae
+8401-Hban-1F-Farnborough	tick_species	keep Haemaphysalis petrogalis (id string 'Hban' is wrong)	2026-11-10	mitogenome (14.8 kb, 47x) 0.12% from petrogalis B4283 (Cooberrie) and 0.41% from B6876; 9.1% from H. bancrofti ref NC_041076 and 8.0-9.6% from 15 bancrofti-labelled samples; nuclear rRNA 100% Haemaphysalis

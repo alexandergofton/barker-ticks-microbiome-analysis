@@ -4,3 +4,10 @@
 file_stem	sample_id	found_in	note
 8334-AMLoculosum-BriddledTurn7	8334-AMLoculosum-BriddledTurn	lca	trailing "7" typo in the LCA filename only
 B6852_F1_38_1	B6852_F1_38_S1	contigs	missing "S" in the contigs filename only
+3263	B3263	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number
+8016	B8016	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number
+8143	B8143	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number
+8208	B8208	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number
+8223	B8223	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number
+8279	B8279	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number
+8286	B8286	all	B prefix added to the sample_id in barker_microbe_analysis_metadata.csv (user decision 2026-11-10); files on disk keep the bare B-number

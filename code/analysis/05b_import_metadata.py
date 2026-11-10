@@ -24,6 +24,13 @@ Content is NEVER changed. Anything that looks wrong biologically -- host_type
 disagreeing with the host named, the species disagreeing with the sample-id
 string, coordinates outside Australia -- is written to
 results/audit/metadata_import_issues.tsv for you to check against the source.
+
+Once a `review` item has been checked, record the decision in
+metadata/metadata_review_decisions.tsv (sample_id, field, decision, date,
+evidence). A matching issue is then written with level `resolved` and the
+decision appended, so it stops being reported as open. If the decision was to
+change a value, change it in the CSV as well -- the decisions file only
+records why.
 """
 
 from __future__ import annotations
@@ -41,6 +48,7 @@ SRC = ROOT / "metadata" / "barker_microbe_analysis_metadata.csv"
 TEMPLATE = ROOT / "metadata" / "sample_metadata_TEMPLATE.tsv"
 OUT = ROOT / "metadata" / "sample_metadata.tsv"
 ISSUES = ROOT / "results" / "audit" / "metadata_import_issues.tsv"
+DECISIONS = ROOT / "metadata" / "metadata_review_decisions.tsv"
 
 ARGASIDAE = {"Argas", "Ornithodoros", "Otobius", "Alectorobius"}
 HOST_TYPES = {"Mammal", "Reptile", "Bird", "Questing"}
@@ -93,9 +101,22 @@ def main() -> None:
     with open(TEMPLATE) as fh:
         tmpl = {r["sample_id"]: r for r in csv.DictReader(fh, delimiter="\t")}
 
+    decisions: dict[tuple[str, str], dict] = {}
+    if DECISIONS.exists():
+        with open(DECISIONS) as fh:
+            lines = [ln for ln in fh if not ln.startswith("#")]
+        for d in csv.DictReader(lines, delimiter="\t"):
+            decisions[(d["sample_id"], d["field"])] = d
+
     issues: list[dict] = []
+    used: set[tuple[str, str]] = set()
 
     def flag(sid: str, field: str, level: str, msg: str) -> None:
+        d = decisions.get((sid, field))
+        if level == "review" and d:
+            used.add((sid, field))
+            level = "resolved"
+            msg += f" -- DECIDED {d['date']}: {d['decision']}"
         issues.append({"sample_id": sid, "field": field, "level": level, "issue": msg})
 
     rows = []
@@ -190,6 +211,10 @@ def main() -> None:
     missing = set(tmpl) - {r["sample_id"] for r in rows}
     for sid in sorted(missing):
         flag(sid, "sample_id", "error", "in the audit but missing from the metadata CSV")
+
+    for key in sorted(set(decisions) - used):
+        flag(key[0], key[1], "info",
+             f"decision in {DECISIONS.name} matches no current review item (stale?)")
 
     write_tsv(OUT, rows, OUT_COLS)
     write_tsv(ISSUES, issues, ["sample_id", "field", "level", "issue"])

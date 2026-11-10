@@ -29,6 +29,7 @@ variation. Step 8 tests composition against them.
 
 from __future__ import annotations
 
+import csv
 import re
 import sys
 from pathlib import Path
@@ -89,7 +90,20 @@ def parse_runs() -> dict[str, dict]:
     aliases = load_aliases()
     out: dict[str, dict] = {}
     if not MANIFEST.exists():
-        print(f"WARN: {MANIFEST} not found; run fields left blank", file=sys.stderr)
+        # The manifest has been removed from disk, but its parsed values are
+        # still in the existing template. Carry them over (canonicalising ids,
+        # so a sample renamed via sample_aliases.tsv keeps its run fields)
+        # rather than blanking the only technical covariates this study has.
+        tmpl = ROOT / "metadata" / "sample_metadata_TEMPLATE.tsv"
+        if tmpl.exists():
+            with open(tmpl) as fh:
+                for r in csv.DictReader(fh, delimiter="\t"):
+                    if r.get("flowcell"):
+                        out[canonical(r["sample_id"], aliases)] = {
+                            k: r[k] for k in
+                            ("flowcell", "index_i7", "index_i5", "lane", "seq_run")}
+        print(f"WARN: {MANIFEST} not found; run fields for {len(out)} samples "
+              f"carried over from the existing {tmpl.name}", file=sys.stderr)
         return out
     with open(MANIFEST) as fh:
         for line in fh:
