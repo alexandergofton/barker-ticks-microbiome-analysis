@@ -1,0 +1,604 @@
+---
+title: "Are the other viral contigs real?"
+subtitle: "Genuine viruses, endogenous viral elements, tick genomic repeats and technical sequence among every other viral LCA assignment"
+author: "Alexander Gofton"
+date: today
+date-format: "D MMMM YYYY"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools: true
+    code-overflow: scroll
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+    callout-appearance: simple
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+<!-- CONCLUSION -->
+
+# Background and question
+
+This is the third audit of its kind. `../Cheeloo_Jingmen-like_virus/are_these_real.qmd`
+and `../north_shore_virus/are_these_real.qmd` showed that the 16,699 Cheeloo
+Jingmen-like virus contigs and all but 9 of the 10,390 North shore virus contigs were
+tick genomic repeats. In both cases a tick repeat sits at the end of the viral reference
+records. Those contigs are now re-assigned to Ixodida (`metadata/contig_reassignments.tsv`)
+and are **not** repeated here.
+
+This document covers **every other contig whose LCA is a virus**. For each one, it asks
+whether the contig is:
+
+1. **genuine virus**, i.e. viral nucleic acid carried through the DNA extraction (or,
+   for phages, phage or prophage DNA);
+2. an **endogenous viral element (EVE)**, i.e. viral coding sequence integrated in a
+   host genome and flanked by host DNA;
+3. a **misclassified genomic element**, such as:
+   - a tick (or other host) repeat, including a SINE, carried in a viral reference
+     record;
+   - a cellular gene with a viral homologue; or
+4. **technical sequence**, i.e. library adapters shared by our contigs and the
+   reference records.
+
+Lines of evidence used:
+
+- contig length vs viral-hit length, and non-viral co-hits in the original BLAST;
+- a competitive protein-level search (DIAMOND blastx against viral **and** cellular
+  proteins);
+- where the nucleotide hits fall on the reference records (inside a CDS or not), and
+  whether they pile up on one narrow window;
+- adapter content of those windows and of our contigs;
+- for each recurring element:
+  - copy number;
+  - flank diversity;
+  - tick-genus distribution;
+  - a tRNA B-box motif;
+  - an NCBI search for the element in cellular genomes;
+- for protein-supported contigs: what flanks the viral ORF, and whether the reading
+  frame is intact.
+
+```{r}
+#| label: setup
+#| code-summary: "Set-up: paths, tool locations and plotting helpers"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(knitr)
+
+ROOT <- "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis"
+OV   <- file.path(ROOT, "extracting_pathogens/other_viral_taxa")
+W    <- file.path(OV, "are_these_real")           # all intermediate files land here
+dir.create(file.path(W, "ncbi"), recursive = TRUE, showWarnings = FALSE)
+
+# Bash chunks inherit these. BLAST+, DIAMOND, cd-hit and python3 come from the
+# base miniforge install; seqkit is the system copy.
+Sys.setenv(ROOT = ROOT, OV = OV, W = W,
+           PATH = paste("/data/hb-austick/work/miniforge3/bin", "/usr/bin",
+                        Sys.getenv("PATH"), sep = ":"))
+
+col_main <- "#014B87"   # CSIRO Ocean Blue
+col_alt  <- "#E87721"   # CSIRO Orange
+cat_cols <- c("genuine" = "#014B87", "genuine (prophage)" = "#6EC1E4",
+              "EVE candidate" = "#E87721", "misclassified genomic" = "#78BE20",
+              "technical artefact" = "#DF1995", "unverified" = "#BBBBBB")
+theme_set(theme_minimal(base_size = 12) +
+          theme(panel.grid.minor = element_blank(),
+                plot.title.position = "plot"))
+rd <- function(f, ...) read.delim(file.path(W, f), check.names = FALSE, quote = "", ...)
+fmt <- function(x) format(x, big.mark = ",")
+```
+
+# Extraction
+
+Upstream, every SPAdes contig was searched with `blastn` (megablast) against NCBI nt
+(2025-05-04 snapshot), using `-max_target_seqs 10 -evalue 1e-5`, and an LCA was computed
+per contig. `extract_other_viral_taxa.sh` is the North shore virus extraction script,
+generalised from one taxid to a list. The list (`viral_taxids.tsv`) holds every taxon in
+`results/taxonomy/taxon_lineage.tsv` with `superkingdom_group == Viruses`, except
+Cheeloo Jingmen-like virus and North shore virus. The script writes, per sample:
+
+- the contigs (`fasta/`);
+- **all** BLAST hits of those contigs (`blast/`);
+- the LCA rows (`lca_assignments.tsv`).
+
+::: {.callout-note}
+As before, `-max_target_seqs 10` means a **missing** non-viral hit is weak evidence, and
+a **present** one is informative. The extraction streams every sample's BLAST file
+(~460 GB; one is 160 GB), so it was run once, outside this document.
+:::
+
+```{bash}
+#| label: show-extract
+#| code-summary: "The extraction script (run once, outside this document)"
+cat "$OV/extract_other_viral_taxa.sh"
+echo; echo "---- log notes ----"; grep -E "NOTE|WARN" "$OV/extract.log" || echo none
+```
+
+```{bash}
+#| label: step01
+#| code-summary: "Step 01: per-contig nucleotide evidence (scripts/01_contig_evidence.py)"
+cd "$OV"
+[ -s "$W/contig_evidence.tsv" ] && [ "$W/contig_evidence.tsv" -nt lca_assignments.tsv ] ||
+  python3 scripts/01_contig_evidence.py
+sed -n '2,/^"""/p' scripts/01_contig_evidence.py | head -n -1
+```
+
+```{r}
+#| label: overview
+#| code-summary: "Contigs, samples and sequence per virus group"
+vt <- rd("viral_taxa.tsv")
+ce <- rd("contig_evidence.tsv")
+summ <- read.delim(file.path(OV, "summary.tsv"))
+cat(sprintf("%s samples, %s contigs, %s bp, %s BLAST hits, %d viral taxa\n", nrow(summ),
+            fmt(sum(summ$n_contigs)), fmt(sum(summ$total_bp)), fmt(sum(summ$n_blast_hits)),
+            sum(vt$n_contigs > 0)))
+ce |> group_by(virus_group) |>
+  summarise(taxa = n_distinct(lca_taxid), contigs = n(), samples = n_distinct(sample_id),
+            Mb = round(sum(len) / 1e6, 2), median_len = median(len),
+            median_viral_bp = median(viral_bp)) |>
+  arrange(desc(contigs)) |> kable(format.args = list(big.mark = ","),
+                                  caption = "Viral-LCA contigs by virus group")
+```
+
+`bacteriophage` means the lineage runs through a phage or archaeal-virus clade
+(*Caudoviricetes*, *Inoviridae*, *Microviridae*, …). `unresolved` means the LCA stopped
+above family and outside those clades (*Viruses*, *Riboviria*, *Heunggongvirae*).
+
+```{r}
+#| label: fig-top-taxa
+#| fig-cap: "The 30 viral taxa with the most contigs (excluding Cheeloo Jingmen-like virus and North shore virus). A long tail of 680 further taxa have fewer than 50 contigs each."
+#| fig-width: 9
+#| fig-height: 7
+vt |> slice_max(n_contigs, n = 30) |>
+  ggplot(aes(reorder(name, n_contigs), n_contigs, fill = virus_group)) +
+  geom_col(width = 0.75) +
+  geom_text(aes(label = n_samples), hjust = -0.2, size = 3) +
+  coord_flip(clip = "off") +
+  scale_y_continuous(labels = scales::label_comma(), expand = expansion(c(0, 0.08))) +
+  scale_fill_manual(values = c(bacteriophage = "#6EC1E4", `eukaryotic virus` = col_main,
+                               unresolved = col_alt), name = NULL) +
+  labs(x = NULL, y = "Contigs (label: samples)") + theme(legend.position = "top")
+```
+
+# Contig length vs viral-hit length
+
+```{r}
+#| label: fig-len-vs-hit
+#| fig-cap: "Contig length vs the length covered by viral BLAST hits. The dashed line is y = x (a contig entirely covered by viral hits). As for the two earlier viruses, most contigs carry a short viral hit inside a much longer contig."
+#| fig-width: 9
+#| fig-height: 5
+ggplot(ce, aes(len, pmax(viral_bp, 1), colour = nonviral_bp > 0)) +
+  geom_point(size = 0.5, alpha = 0.35) +
+  geom_abline(linetype = 2, colour = "grey50") +
+  facet_wrap(~virus_group) +
+  scale_x_log10(labels = scales::label_comma()) + scale_y_log10(labels = scales::label_comma()) +
+  scale_colour_manual(values = c(`FALSE` = col_main, `TRUE` = col_alt),
+                      labels = c("Viral hits only", "Also a non-viral hit"), name = NULL) +
+  labs(x = "Contig length (bp, log)", y = "bp covered by viral hits (log)") +
+  theme(legend.position = "top")
+ce |> summarise(median_viral_bp = median(viral_bp), median_len = median(len),
+                pct_viral_frac_lt_0.25 = round(100 * mean(viral_frac < 0.25), 1),
+                pct_with_nonviral_hit = round(100 * mean(nonviral_bp > 0), 1)) |> kable()
+```
+
+# Which contigs encode viral protein?
+
+## A competitive protein search
+
+A viral-only protein database would over-call viruses. Herpesvirus dUTPase, phage
+integrases and many other viral proteins have cellular homologues. Each contig was
+therefore searched with DIAMOND blastx (`--sensitive`, e ≤ 1e-5, 25 targets) against a
+database that holds both:
+
+| Component | Proteins | Group |
+|---|---|---|
+| RefSeq viral proteins | ~723,000 | virus |
+| CDS translations of every viral record our contigs hit (most tick viruses are not in RefSeq) | see below | virus |
+| UniProt Swiss-Prot | ~576,000 | by taxid: bacteria, vertebrate, arthropod, … |
+| *Ixodes scapularis* proteome (GCF_016920785.2) | ~34,000 | tick |
+
+A contig is **viral at the protein level** only if its best viral hit scores at least as
+high as its best cellular hit.
+
+```{bash}
+#| label: step02-04
+#| code-summary: "Steps 02-04: fetch hit records, build the protein database, DIAMOND blastx"
+cd "$OV"
+[ -s "$W/ncbi/hitrec.ft" ] || python3 scripts/02_fetch_hit_records.py
+[ -s "$W/protdb.dmnd" ]    || python3 scripts/03_build_protein_db.py
+[ -s "$W/protein_evidence.tsv" ] && [ "$W/protein_evidence.tsv" -nt "$W/diamond.tsv" ] ||
+  python3 scripts/04_protein_evidence.py
+echo "viral records hit: $(grep -c '^>Feature' $W/ncbi/hitrec.ft);  proteins from them: $(grep -c '^>' $W/ncbi/hitrec_prot.fa)"
+cut -f2 "$W/protdb_groups.tsv" | tail -n +2 | sort | uniq -c | sort -rn
+```
+
+```{r}
+#| label: prot-calls
+#| code-summary: "Protein call by virus group"
+pe <- rd("protein_evidence.tsv")
+cep <- ce |> mutate(id = paste0(sample, "|", contig)) |> left_join(pe, by = "id")
+cep |> count(virus_group, prot_call) |>
+  pivot_wider(names_from = prot_call, values_from = n, values_fill = 0) |>
+  mutate(pct_viral = round(100 * viral / (viral + cellular + none), 1)) |>
+  kable(format.args = list(big.mark = ","), caption = "Best protein hit: viral, cellular, or none")
+cep |> filter(prot_call == "cellular") |> count(virus_group, cell_group) |>
+  pivot_wider(names_from = virus_group, values_from = n, values_fill = 0) |>
+  arrange(desc(rowSums(across(where(is.numeric))))) |>
+  kable(caption = "Contigs whose best protein hit is cellular: which organism group wins")
+```
+
+# Where the nucleotide hits fall on the reference records
+
+Each viral hit was placed on its reference record and tested against the record's CDS
+annotation (GenBank feature tables). The search then looked for **hotspots** within each
+record: the 300 bp window covered by the most distinct contigs. That window was set
+aside and the search repeated. This is how both earlier audits found their elements, as
+thousands of contigs stacked on 70–300 bp at one end of the records. A genuine virus
+sampled by many contigs instead tiles the whole record.
+
+```{bash}
+#| label: step05
+#| code-summary: "Step 05: hits on the references, hotspots (scripts/05_reference_hotspots.py)"
+cd "$OV" && python3 scripts/05_reference_hotspots.py
+```
+
+```{r}
+#| label: hotspots
+#| code-summary: "The largest hotspots"
+hs <- rd("hotspots.tsv")
+hw <- rd("hotspot_windows.tsv")
+hs <- hs |> mutate(hotspot = paste0(saccver, "#", peak)) |>
+  left_join(select(hw, hotspot, element, adapter_bp), by = "hotspot")
+cat(sprintf("%d hotspots (>= 10 contigs) on %d records, holding %s contig-hotspot memberships; %.1f%% of their hits fall outside any annotated CDS\n",
+            nrow(hs), n_distinct(hs$saccver), fmt(sum(hs$n_contigs)),
+            100 * (1 - weighted.mean(hs$frac_in_cds, hs$n_contigs))))
+hs |> slice_max(n_contigs, n = 25) |>
+  transmute(record = saccver, species = ssciname, window = paste0(start, "-", end),
+            contigs = n_contigs, samples = n_samples, share, in_CDS = frac_in_cds,
+            protein_viral = frac_prot_viral, hit_len = median_hit_len,
+            element = ifelse(element == "adapter", "ADAPTER", element)) |>
+  kable(format.args = list(big.mark = ","),
+        caption = "25 largest hotspots. share = hotspot contigs / all contigs hitting the record; in_CDS = fraction of hits inside an annotated CDS; protein_viral = fraction of hotspot contigs with viral protein support")
+```
+
+```{r}
+#| label: fig-depth
+#| fig-cap: "Hit depth (distinct contigs per position) along the eight most-hit reference records. Shaded: annotated CDS. Every record shows a single tall spike outside the coding sequence."
+#| fig-width: 10
+#| fig-height: 9
+hr <- rd("hits_ref.tsv")
+top <- hr |> distinct(id, saccver, ssciname) |> count(saccver, ssciname) |> slice_max(n, n = 8)
+ft <- readLines(file.path(W, "ncbi/hitrec.ft"))
+cds <- list(); acc <- NA; key <- NA
+for (l in ft) {
+  if (startsWith(l, ">Feature")) { acc <- sub(".*\\|([^|]+)\\|.*", "\\1", l); key <- NA; next }
+  a <- strsplit(l, "\t")[[1]]
+  if (length(a) >= 3 && nzchar(a[3])) key <- a[3]
+  if (acc %in% top$saccver && length(a) >= 2 && nzchar(a[1]) && identical(key, "CDS"))
+    cds[[length(cds) + 1]] <- data.frame(saccver = acc,
+      s = as.numeric(gsub("[<>]", "", a[1])), e = as.numeric(gsub("[<>]", "", a[2])))
+}
+cds <- bind_rows(cds) |> mutate(lo = pmin(s, e), hi = pmax(s, e))
+dep <- hr |> filter(saccver %in% top$saccver) |> distinct(id, saccver, sstart, send) |>
+  rowwise() |> reframe(saccver, pos = seq(sstart, send, by = 5)) |>
+  count(saccver, pos, name = "contigs")
+lab <- setNames(paste0(top$saccver, " ", top$ssciname, " (", fmt(top$n), " contigs)"), top$saccver)
+ggplot(dep, aes(pos, contigs)) +
+  geom_rect(data = cds, aes(xmin = lo, xmax = hi, ymin = 0, ymax = Inf), inherit.aes = FALSE,
+            fill = col_main, alpha = 0.08) +
+  geom_col(width = 5, fill = col_main) +
+  facet_wrap(~saccver, scales = "free", ncol = 2, labeller = as_labeller(lab)) +
+  scale_x_continuous(labels = scales::label_comma()) +
+  labs(x = "Position on the reference record", y = "Distinct contigs") +
+  theme(strip.text = element_text(size = 8))
+```
+
+# Technical sequence: library adapters at the ends of reference records
+
+```{bash}
+#| label: step06-07
+#| code-summary: "Steps 06-07: classify contigs; characterise hotspot windows as elements"
+cd "$OV"
+python3 scripts/06_classify.py      # first pass: element step reads tick genus from here
+python3 scripts/07_elements.py
+python3 scripts/06_classify.py
+```
+
+```{r}
+#| label: adapters
+#| code-summary: "Hotspot windows that are adapter sequence"
+ad <- hw |> filter(element == "adapter") |> left_join(select(hs, hotspot, ssciname, n_contigs, n_samples), by = "hotspot")
+cat(sprintf("%d of %d hotspot windows are adapter / homopolymer sequence; they hold %s contig memberships across %d records\n",
+            nrow(ad), nrow(hw), fmt(sum(ad$n_contigs)), n_distinct(sub("#.*", "", ad$hotspot))))
+ad |> arrange(desc(n_contigs)) |> head(8) |>
+  transmute(hotspot, species = ssciname, contigs = n_contigs,
+            sequence = ifelse(nchar(sequence) > 110, paste0(substr(sequence, 1, 110), "…"), sequence)) |>
+  kable(caption = "Largest adapter hotspots, with the window sequence")
+```
+
+<!-- ADAPTER-TEXT -->
+
+```{r}
+#| label: adapter-contigs
+#| code-summary: "Contigs whose only viral evidence is adapter sequence"
+cv <- rd("contig_verdicts.tsv")
+cv |> filter(class == "adapter artefact") |>
+  summarise(contigs = n(), samples = n_distinct(sample_id), taxa = n_distinct(lca_name),
+            median_len = median(len), median_adapter_bp = median(adapter_bp)) |> kable()
+cv |> filter(class == "adapter artefact") |> count(lca_name, sort = TRUE, name = "contigs") |>
+  head(10) |> kable(caption = "Taxa called from adapter sequence alone")
+```
+
+# Tick genomic elements in the reference records
+
+The hotspot windows that are not adapter sequence were clustered into **elements** by
+all-vs-all blastn. For each element, the longest window was used as a probe against
+every viral-LCA contig to measure:
+
+- copy number;
+- flank diversity, i.e. the 150 bp either side of each copy, clustered at 90% with
+  cd-hit-est;
+- tick-genus distribution.
+
+Each probe was also searched against the Cheeloo Jingmen-like virus and North shore
+virus elements, and checked for a tRNA B-box (`GGTTCGANTCC`, either strand).
+
+Finally, each probe, a subsequence of a **public** viral record, was sent to NCBI BLAST
+(megablast, core_nt) **with viruses excluded**. A hit there is a cellular record that
+carries the same sequence.
+
+```{bash}
+#| label: step08
+#| code-summary: "Step 08: remote NCBI BLAST of the element probes, viruses excluded (cached)"
+cd "$OV" && python3 scripts/08_remote_blast_elements.py
+```
+
+```{r}
+#| label: elements
+#| code-summary: "Elements: copies, flanks, genera, cellular hits"
+el <- rd("elements.tsv")
+rb <- rd("remote_blast.tsv")
+rb1 <- rb |> group_by(element) |>
+  summarise(cellular_hit = ifelse(first(rank) == 0, "none (megablast)",
+              sprintf("%s (%s%% / %s bp)", first(title), first(pident), first(aln_len))))
+el |> left_join(rb1, by = "element") |>
+  transmute(element, `reference species` = ref_species, records = n_windows,
+            `hotspot contigs` = hotspot_contigs, copies, `contigs w/ copy` = contigs_with_copy,
+            `flank clusters (up)` = sprintf("%d / %d", up_clusters, up_flanks),
+            `flank clusters (down)` = sprintf("%d / %d", down_clusters, down_flanks),
+            genera, `B-box` = bbox, in_CDS = frac_in_cds, `similar to` = similar_to,
+            `best non-viral NCBI hit` = cellular_hit) |>
+  kable(format.args = list(big.mark = ","),
+        caption = "Elements. Flank clusters: 90% clusters / flanks; close to 1 cluster per flank = a different genomic context for every copy (interspersed repeat).")
+```
+
+```{r}
+#| label: fig-elem-genus
+#| fig-cap: "Copies of each element by tick genus (viral-LCA contigs only). Labels: samples with the element / samples of that genus with any viral-LCA contig."
+#| fig-width: 9
+#| fig-height: 5
+ec <- rd("element_copies.tsv")
+gsz <- cv |> distinct(sample_id, tick_genus) |> count(tick_genus, name = "n_genus")
+eg <- ec |> distinct(element, id) |>
+  left_join(distinct(cv, id, sample_id, tick_genus), by = "id") |>
+  group_by(element, tick_genus) |> summarise(copies = n(), samples = n_distinct(sample_id), .groups = "drop") |>
+  left_join(gsz, by = "tick_genus")
+ggplot(eg, aes(tick_genus, copies)) +
+  geom_col(fill = col_main, width = 0.7) +
+  geom_text(aes(label = paste0(samples, "/", n_genus)), vjust = -0.3, size = 2.8) +
+  facet_wrap(~factor(element, levels = el$element), scales = "free_y") +
+  scale_y_continuous(expand = expansion(c(0, 0.2))) +
+  labs(x = NULL, y = "Contigs carrying a copy") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+```
+
+<!-- ELEMENT-TEXT -->
+
+# Misassigned cellular genes
+
+```{r}
+#| label: cellular
+#| code-summary: "Contigs whose best protein hit is cellular"
+cv |> filter(class == "cellular gene") |> count(virus_group, cell_group, name = "contigs") |>
+  arrange(desc(contigs)) |> kable(caption = "Cellular-gene contigs, by the group of the winning protein")
+cv |> filter(class == "cellular gene") |> count(lca_name, cell_group, sort = TRUE, name = "contigs") |>
+  head(15) |> kable(caption = "Taxa most often called from a cellular gene")
+cv |> filter(class == "cellular gene", virus_group != "bacteriophage") |>
+  mutate(cell_title = sub(" OS=.*", "", cell_title)) |>
+  count(cell_group, cell_title, sort = TRUE, name = "contigs") |> head(15) |>
+  kable(caption = "Most frequent winning cellular proteins (eukaryotic and unresolved viruses)")
+```
+
+# Endogenous viral elements
+
+A contig is an **EVE candidate** if it encodes a viral protein (viral hit beats every
+cellular hit, ≥ 90 bp) and, **outside** that viral region, either:
+
+- carries a eukaryotic protein (≥ 150 bp of cellular blastx coverage not overlapping the
+  viral HSPs, best cellular group tick, arthropod, vertebrate or other eukaryote); or
+- has a eukaryotic nucleotide hit (≥ 50 bp not overlapping a viral hit).
+
+That is, viral coding sequence joined to host sequence. Contigs with a viral ORF and
+≥ 500 bp of sequence that has **no** evidence either way are listed separately
+(`viral ORF + long flank`). They are weaker candidates, since the flank could be
+non-coding viral sequence missing from the databases.
+
+```{bash}
+#| label: step09
+#| code-summary: "Step 09: reading frames of protein-supported contigs (tblastn vs best viral protein)"
+cd "$OV" && python3 scripts/09_reading_frames.py && wc -l < "$W/reading_frames.tsv"
+```
+
+```{r}
+#| label: eve
+#| code-summary: "EVE candidates"
+rf <- rd("reading_frames.tsv")
+eve <- cv |> filter(category == "EVE candidate") |> left_join(rf, by = "id")
+eve |> count(class, lca_name, viral_family, sort = TRUE, name = "contigs") |>
+  kable(caption = "EVE candidates by taxon")
+eve |> filter(class == "EVE candidate (host flank)") |>
+  transmute(id, tick_genus, taxon = lca_name, len, cov = kmer_cov,
+            viral_protein = substr(viral_title, 1, 50), aa_id = viral_pident,
+            viral_bp = viral_prot_bp, flank_group = ifelse(cell_group != "", cell_group, nonviral_groups),
+            host_protein = substr(sub(" OS=.*", "", cell_title), 1, 45),
+            stops, frames) |>
+  arrange(taxon) |> kable(caption = "EVE candidates with host sequence beside the viral ORF")
+```
+
+## Taxon overrides
+
+Three groups encode a viral protein but are not evidence of a virus in the tick, so their
+protein-supported contigs are reclassified whatever their flanks:
+
+- **Retroviridae** -> `endogenous retrovirus` (EVE candidate). The hits are vertebrate
+  ERVs (Echidna ERV, possum and bower bird retroviruses), carried in blood-meal DNA.
+- **Eupolintoviridae** -> `endogenous adintovirus` (EVE candidate). Adintoviruses are
+  polinton-like elements integrated in host genomes.
+- **Papillomaviridae at >= 95 % aa identity** -> `human papillomavirus contaminant`
+  (technical artefact). Near-identical human HPV types are reagent or handling
+  contamination.
+
+```{r}
+#| label: overrides
+#| code-summary: "Contigs reclassified by taxon override"
+cv |> filter(class %in% c("endogenous retrovirus", "endogenous adintovirus",
+                          "human papillomavirus contaminant")) |>
+  group_by(class, lca_name) |>
+  summarise(contigs = n(), samples = n_distinct(sample_id),
+            aa_identity = paste(range(round(viral_pident)), collapse = "-"),
+            genera = paste(sort(unique(tick_genus)), collapse = ", "), .groups = "drop") |>
+  arrange(class, desc(contigs)) |> kable(caption = "Contigs reclassified by taxon override")
+```
+
+<!-- EVE-TEXT -->
+
+# Genuine viruses
+
+```{r}
+#| label: genuine
+#| code-summary: "Protein-supported eukaryotic-virus contigs without host flanks"
+md <- read.delim(file.path(ROOT, "metadata/sample_metadata.tsv"))
+gen <- cv |> filter(class == "viral (protein-supported)") |> left_join(rf, by = "id")
+gen |> group_by(lca_name, viral_family) |>
+  summarise(contigs = n(), samples = n_distinct(sample_id), kb = round(sum(len) / 1e3, 1),
+            median_cov = median(kmer_cov), aa_identity = paste(range(round(viral_pident)), collapse = "-"),
+            with_stops = sum(stops > 0, na.rm = TRUE),
+            genera = paste(sort(unique(tick_genus)), collapse = ", "), .groups = "drop") |>
+  arrange(desc(contigs)) |>
+  kable(caption = "Eukaryotic and unresolved viral taxa with protein-supported, flank-free contigs")
+```
+
+```{r}
+#| label: phage
+#| code-summary: "Bacteriophages"
+cv |> filter(virus_group == "bacteriophage") |> count(class, sort = TRUE, name = "contigs") |>
+  mutate(pct = round(100 * contigs / sum(contigs), 1)) |> kable(caption = "Bacteriophage contigs by class")
+```
+
+<!-- GENUINE-TEXT -->
+
+# Verdict for every taxon
+
+The contig classes roll up into five categories:
+
+| Category | Contig classes |
+|---|---|
+| genuine | viral (protein-supported); phage (protein-supported) |
+| genuine (prophage) | phage protein beside a bacterial gene or hit |
+| EVE candidate | EVE candidate (host flank); viral ORF + long flank; endogenous retrovirus; endogenous adintovirus |
+| misclassified genomic | hotspot repeat; tick sequence (no protein, tick nt co-hit); cellular gene |
+| technical artefact | adapter artefact; human papillomavirus contaminant |
+| unverified | nucleotide-only hits, no protein, no repeat or host signal |
+
+A taxon's verdict is its majority category. Genuine and EVE contigs are always listed
+when present, even when artefacts dominate (as for North shore virus: 9 genuine contigs
+among 10,390).
+
+```{r}
+#| label: fig-categories
+#| fig-cap: "Contig categories for the 30 viral taxa with the most contigs."
+#| fig-width: 10
+#| fig-height: 8
+tv <- rd("taxon_verdicts.tsv")
+cats <- names(cat_cols)
+tv |> slice_max(n_contigs, n = 30, with_ties = FALSE) |>
+  pivot_longer(all_of(cats), names_to = "category", values_to = "contigs") |>
+  mutate(category = factor(category, levels = rev(cats))) |>
+  ggplot(aes(reorder(name, n_contigs), contigs, fill = category)) +
+  geom_col(width = 0.75) + coord_flip() +
+  scale_fill_manual(values = cat_cols, breaks = cats, name = NULL) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(x = NULL, y = "Contigs") + theme(legend.position = "top") +
+  guides(fill = guide_legend(nrow = 2))
+```
+
+```{r}
+#| label: all-totals
+#| code-summary: "Totals over all taxa"
+cv |> count(category, name = "contigs") |>
+  left_join(cv |> group_by(category) |> summarise(Mb = round(sum(len) / 1e6, 2),
+                                                  samples = n_distinct(sample_id)), by = "category") |>
+  mutate(pct = round(100 * contigs / sum(contigs), 1)) |>
+  arrange(match(category, cats)) |> kable(format.args = list(big.mark = ","))
+tv |> count(virus_group, verdict = sub(" \\+.*", "", verdict), name = "taxa") |>
+  pivot_wider(names_from = virus_group, values_from = taxa, values_fill = 0) |>
+  kable(caption = "Taxa by majority verdict")
+```
+
+All 711 taxa are in the searchable table below, and in `are_these_real/taxon_verdicts.tsv`.
+
+```{r}
+#| label: tbl-all
+#| code-summary: "Interactive table of every taxon"
+DT::datatable(
+  tv |> select(name, virus_group, family, n_contigs, n_samples, all_of(cats), genuine_samples,
+               eve_samples, main_class, verdict),
+  rownames = FALSE, filter = "top", extensions = "Buttons",
+  options = list(pageLength = 25, scrollX = TRUE, dom = "Bfrtip", buttons = c("csv"),
+                 order = list(list(3, "desc"))))
+```
+
+<!-- CONCLUSIONS -->
+
+# Files and versions
+
+All intermediate files are in `are_these_real/`, beside this document. The extraction
+outputs (`fasta/`, `blast/`, `ids/`, `summary.tsv`, `lca_assignments.tsv`, `extract.log`,
+`viral_taxids.tsv`) are in this directory, and the analysis scripts are in `scripts/`.
+
+| File | Contents |
+|---|---|
+| `viral_taxa.tsv` | the 711 viral LCA taxa: lineage, virus group, counts |
+| `allhits.tsv`, `contig_evidence.tsv` | every BLAST hit with subject organism group; per-contig nucleotide evidence |
+| `all_viral.fa`, `allviraldb.*` | all contigs (sample-prefixed) and their BLAST db |
+| `ncbi/hitrec.{fa,ft}`, `ncbi/hitrec_prot.fa` | viral records hit: sequence, feature tables, CDS proteins |
+| `protdb_download/`, `protdb.fa`, `protdb_groups.tsv`, `protdb.dmnd` | competitive protein database |
+| `diamond.tsv`, `protein_evidence.tsv` | raw DIAMOND blastx; per-contig protein call |
+| `hits_ref.tsv`, `hotspots.tsv`, `hotspot_members.tsv` | viral hits on the references; hotspots and their contigs |
+| `hotspot_windows.{fa,tsv}`, `elements.tsv`, `element_copies.tsv`, `E*.fa`, `E*_{up,down}*` | windows, elements, copies, flanks and clusters |
+| `remote_blast.{json,tsv}` | NCBI BLAST of element probes (viruses excluded) |
+| `reading_frames.tsv` | stops and frames of protein-supported contigs |
+| **`contig_verdicts.tsv`** | **one row per contig: class and category** |
+| **`taxon_verdicts.tsv`** | **one row per taxon: category counts and verdict** |
+
+```{bash}
+#| label: versions
+#| code-summary: "Tool versions"
+blastn -version | head -1; diamond version; cd-hit-est -h 2>&1 | head -1; seqkit version; python3 --version
+```
+
+```{r}
+#| label: session
+sessionInfo()
+```

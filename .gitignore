@@ -15,7 +15,15 @@ lca/
 contigs/
 contigs_with_missing_reads/
 blast/
-extracting_pathogens/
+# extracting_pathogens/: data ignored, but track the audit scripts and
+# reports' sources, plus the one ids file curate_tick_repeat_contigs.py reads
+extracting_pathogens/**
+!extracting_pathogens/**/
+!extracting_pathogens/**/*.py
+!extracting_pathogens/**/*.sh
+!extracting_pathogens/**/*.qmd
+!extracting_pathogens/**/*.R
+!extracting_pathogens/north_shore_virus/are_these_real/cds.ids
 results/
 
 # Conda envs are recreated from env/*.yml, not stored

@@ -1,0 +1,687 @@
+---
+title: "Are the North shore virus contigs real?"
+subtitle: "Separating genuine North shore virus from tick genomic repeats carried in the reference records"
+author: "Alexander Gofton"
+date: today
+date-format: "D MMMM YYYY"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools: true
+    code-overflow: scroll
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+    callout-appearance: simple
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+::: {.callout-important}
+## Conclusion in one paragraph
+
+The BLAST/LCA step assigned 10,390 contigs from 104 samples to *North shore virus*
+(NSV, taxid 2485875). **Only 9 contigs, from 4 *Ixodes* samples, are genuine NSV.**
+They match the RdRp at the protein level along their entire length, have intact
+reading frames, and carry no tick sequence.
+
+The other ~10,380 contigs are **tick genomic repeats**. More than 95% of them hit a
+sequence that every NSV reference record carries at its 5′ end, upstream of the viral
+sequence:
+
+- 65–365 nt in the 2021 OL4521xx records;
+- ~65 nt in the original 2018 record, MK026569.
+
+That element has these properties:
+
+- it occurs ~9,300 times across these contigs;
+- it sits in highly diverse genomic contexts, on both sides;
+- it co-hits tick genome annotations;
+- it begins with a tRNA-like motif typical of SINE repeats;
+- it is present in *Amblyomma*, *Ixodes*, *Bothriocroton* and *Cryptocroton*, but
+  essentially absent from *Haemaphysalis*.
+
+In our DNA data it is **never** joined to viral sequence. A second, smaller element at
+the 3′ end of MK026569 (positions ~1650–1750) accounts for ~300 *Ixodes* contigs.
+
+None of this is an endogenous viral element: no tick-genomic contig contains viral
+coding sequence. Whether the virus's own 5′ UTR genuinely contains this SINE-like
+sequence, or both independent reference assemblies are chimeras, cannot be settled
+from DNA data (see *Open question*).
+:::
+
+# Background and question
+
+This is the same question as `../Cheeloo_Jingmen-like_virus/are_these_real.qmd`.
+NSV is an RNA virus. Our libraries come from DNA extracts (without RNase treatment), so
+are these contigs:
+
+1. genuine viral RNA carried through the extraction;
+2. **endogenous viral elements (EVEs)**, i.e. viral sequence integrated into the tick
+   genome and flanked by tick DNA; or
+3. something else, such as a tick sequence mis-assigned through the reference database?
+
+Lines of evidence used:
+
+- contig length vs viral-hit length;
+- where the hits fall on the reference records;
+- a protein-level (tblastn) RdRp search;
+- reading-frame integrity of the genuine hits;
+- copy number, flank diversity and genus distribution of the shared elements;
+- whether any contig joins those elements to viral sequence.
+
+```{r}
+#| label: setup
+#| code-summary: "Set-up: paths, tool locations and plotting helpers"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(knitr)
+
+ROOT <- "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis"
+NSV  <- file.path(ROOT, "extracting_pathogens/north_shore_virus")
+W    <- file.path(NSV, "are_these_real")          # all intermediate files land here
+dir.create(file.path(W, "ncbi"), recursive = TRUE, showWarnings = FALSE)
+
+# Bash chunks inherit these. BLAST+, cd-hit and python3 come from the base
+# miniforge install; seqkit is the system copy.
+Sys.setenv(ROOT = ROOT, NSV = NSV, W = W, TAXID = "2485875",
+           PATH = paste("/data/hb-austick/work/miniforge3/bin", "/usr/bin",
+                        Sys.getenv("PATH"), sep = ":"))
+
+col_main <- "#014B87"   # CSIRO Ocean Blue
+col_alt  <- "#E87721"   # CSIRO Orange
+theme_set(theme_minimal(base_size = 12) +
+          theme(panel.grid.minor = element_blank(),
+                plot.title.position = "plot"))
+rd <- function(f, ...) read.delim(file.path(W, f), check.names = FALSE, ...)
+md <- read.delim(file.path(ROOT, "metadata/sample_metadata.tsv")) |>
+  mutate(tick_genus = ifelse(is.na(tick_genus) | tick_genus == "", "(unrecorded)", tick_genus))
+```
+
+# Extraction
+
+Upstream, every SPAdes contig was searched with `blastn` (megablast) against NCBI nt
+(2025-05-04 snapshot), using `-max_target_seqs 10 -evalue 1e-5`, and an LCA was computed
+per contig. `extract_north_shore_virus.sh` is the Cheeloo Jingmen-like virus extraction
+script with the taxid changed. It writes, per sample:
+
+- every contig with LCA = taxid 2485875 (`fasta/`);
+- **all** BLAST hits of those contigs (`blast/`);
+- the LCA rows (`lca_assignments.tsv`).
+
+::: {.callout-note}
+The script had one fix. The LCA file for `8334-AMLoculosum-BriddledTurn7` carries a
+trailing `7` that its contigs and BLAST files lack. The first run stopped there (under
+`set -e`) after 55 of 104 samples. The script now falls back to the longest contigs
+file name that is a prefix of the sample name, and logs a `NOTE`. The Cheeloo
+Jingmen-like virus extraction was not affected: its 50 samples all extracted, and 8334
+had no Jingmen contigs.
+
+As before, `-max_target_seqs 10` means a **missing** tick hit is weak evidence and a
+**present** one is informative.
+:::
+
+```{bash}
+#| label: show-extract
+#| code-summary: "The extraction script (run once, outside this document)"
+cat "$NSV/extract_north_shore_virus.sh"
+echo; echo "---- log notes ----"; grep -E "NOTE|WARN" "$NSV/extract.log" || echo none
+```
+
+```{r}
+#| label: summary-table
+#| code-summary: "Per-sample extraction summary"
+summ <- read.delim(file.path(NSV, "summary.tsv")) |>
+  left_join(select(md, sample_id, tick_genus, tick_species), by = c("sample" = "sample_id"))
+cat(sprintf("%d samples, %s contigs, %s bp, %s BLAST hits\n", nrow(summ),
+            format(sum(summ$n_contigs), big.mark = ","), format(sum(summ$total_bp), big.mark = ","),
+            format(sum(summ$n_blast_hits), big.mark = ",")))
+summ |> count(tick_genus, name = "samples") |> arrange(desc(samples)) |>
+  kable(caption = "Samples with NSV-assigned contigs, by tick genus")
+kable(arrange(summ, desc(total_bp)) |> head(15), format.args = list(big.mark = ","),
+      caption = "15 samples with the most NSV-assigned sequence")
+```
+
+NSV is a ~1.8 kb RdRp segment, yet 104 samples from six genera carry 9.8 Mb of
+"NSV" sequence, often hundreds of contigs per sample.
+
+# Contig length vs viral-hit length
+
+```{bash}
+#| label: per-contig-coverage
+#| code-summary: "Per-contig viral vs non-viral hit coverage (python)"
+cd "$W"
+cat "$NSV"/blast/*.tsv | grep -v '^qaccver' > allhits.tsv
+python3 - <<'EOF'
+import collections, re, glob, os
+J = os.environ["TAXID"]
+q = collections.defaultdict(lambda: {"j": set(), "o": set(), "ot": set()})
+for f in glob.glob(os.environ["NSV"] + "/blast/*.tsv"):
+    s = os.path.basename(f).split(".north_shore_virus")[0]
+    for ln in open(f):
+        if ln.startswith("qaccver"): continue
+        a = ln.rstrip("\n").split("\t")
+        qs, qe = sorted((int(a[11]), int(a[12])))
+        d = q[(s, a[0])]
+        if a[6] == J: d["j"].update(range(qs, qe + 1))
+        else: d["o"].update(range(qs, qe + 1)); d["ot"].add(a[4])
+with open("contig_cov.tsv", "w") as o:
+    o.write("sample\tcontig\tlen\tkmer_cov\tviral_bp\tviral_frac\tother_bp\tother_only_bp\tother_taxa\n")
+    for (s, c), d in q.items():
+        L = int(re.search(r"length_(\d+)", c).group(1))
+        cov = float(re.search(r"cov_([\d.]+)", c).group(1))
+        jb = len(d["j"])
+        o.write("\t".join(map(str, [s, c, L, cov, jb, round(jb / L, 4), len(d["o"]),
+                len(d["o"] - d["j"]), ";".join(sorted(d["ot"]))])) + "\n")
+print("contigs written:", len(q))
+EOF
+```
+
+```{r}
+#| label: fig-len-vs-hit
+#| fig-cap: "Contig length vs the length covered by North shore virus hits. The dashed line is y = x (a contig entirely covered by viral hits). Most contigs carry a short (~70 bp) hit, however long they are."
+#| fig-width: 8
+#| fig-height: 5
+cc <- rd("contig_cov.tsv") |>
+  mutate(tick = ifelse(other_bp > 0, "Also has a non-viral (mostly tick) hit", "Viral hits only"))
+ggplot(cc, aes(len, viral_bp, colour = tick)) +
+  geom_point(size = 0.8, alpha = 0.5) +
+  geom_abline(linetype = 2, colour = "grey50") +
+  scale_x_log10(labels = scales::label_comma()) +
+  scale_y_log10(labels = scales::label_comma()) +
+  scale_colour_manual(values = c(col_alt, col_main), name = NULL) +
+  labs(x = "Contig length (bp, log)", y = "bp covered by viral hits (log)") +
+  theme(legend.position = "top")
+cat(sprintf("Viral hit span: median %d bp, max %d bp. Contig length: median %d, max %s bp. %d contigs (%.1f%%) also hit a non-viral subject.\n",
+            median(cc$viral_bp), max(cc$viral_bp), median(cc$len),
+            format(max(cc$len), big.mark = ","), sum(cc$other_bp > 0), 100 * mean(cc$other_bp > 0)))
+```
+
+# Where the hits fall on the reference records
+
+## The references
+
+```{bash}
+#| label: fetch-refs
+#| code-summary: "Fetch every hit reference record (plus proteins) from NCBI"
+# The nt snapshot is not mounted on this machine, so the public records are
+# fetched from NCBI E-utilities. Cached: only fetched if absent.
+cd "$W"
+awk -F'\t' -v t="$TAXID" '$7==t' allhits.tsv > jhits.tsv
+cut -f2 jhits.tsv | sort -u > jrefs.ids
+E="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore"
+ids=$(paste -sd, jrefs.ids)
+[ -s ncbi/jrefs.fa ]     || curl -s "$E&id=$ids&rettype=fasta&retmode=text" > ncbi/jrefs.fa
+[ -s ncbi/jrefs.gb ]     || curl -s "$E&id=$ids&rettype=gb&retmode=text"    > ncbi/jrefs.gb
+# Proteins of every hit record plus MW741889 (a third, independent NSV RdRp)
+[ -s ncbi/nsv_prot.fa ]  || curl -s "$E&id=$ids,MW741889.1&rettype=fasta_cds_aa&retmode=text" > ncbi/nsv_prot.fa
+seqkit grep -r -p MK026569 ncbi/jrefs.fa > mk.fa
+echo "records hit: $(wc -l < jrefs.ids)"
+awk '/^LOCUS/{l=$2" "$3"bp"} /^DEFINITION/{d=substr($0,13,70)} /\/host=/{h=$0; sub(/.*host=/,"",h)} /^  TITLE/{t=substr($0,13,60)} /^\/\//{print l" | "d" | "h" | "t; t=""}' ncbi/jrefs.gb | sort -u -t'|' -k1,1 | sed -n '1p;/MK026569/p;/OL452128/p'
+grep -c "Gofton" ncbi/jrefs.gb | xargs echo "records submitted by Gofton,A.W.:"
+cut -f2 jhits.tsv | sort | uniq -c | sort -rn | head -8
+```
+
+There are 23 records. Twenty-two are the 2021 OL4521xx records: *I. holocyclus*,
+Trinity-assembled, submitted from CSIRO. The 23rd is **MK026569**, the original 2018 NSV
+segment 1 RdRp from the Sydney "Extensive diversity of RNA viruses in Australian ticks"
+study. It was assembled independently and acts as the control here.
+
+## Defining the viral core of each record
+
+Each OL record was aligned to MK026569. They all match it at 96–99% from MK026569
+position ~2 onwards, but differ in how much **extra** sequence they carry beyond it at
+the 5′ end (3–300 nt) and the 3′ end. Every hit was then placed on the MK026569 coordinate
+system, with 5′ overhang positions taking values ≤ 0.
+
+```{bash}
+#| label: core
+#| code-summary: "Align each reference to MK026569 and map every hit onto MK026569 coordinates"
+cd "$W"
+blastn -task blastn -query ncbi/jrefs.fa -subject mk.fa -evalue 1e-10 \
+       -outfmt '6 qseqid qlen qstart qend sstart send pident length' > core_vs_mk.tsv
+python3 - <<'EOF'
+import collections, glob, os
+core = {}
+for l in sorted(open("core_vs_mk.tsv"), key=lambda l: -int(l.split()[7])):
+    a = l.split()
+    if a[0] not in core: core[a[0]] = (int(a[2]), int(a[3]), int(a[4]), int(a[1]), float(a[6]))
+with open("ref_core.tsv", "w") as o:
+    o.write("acc\tlen\tcore_start\tcore_end\tmk_start\tpident\toverhang5\toverhang3\n")
+    for k, (cs, ce, ms, L, p) in sorted(core.items()):
+        o.write(f"{k}\t{L}\t{cs}\t{ce}\t{ms}\t{p}\t{cs-1}\t{L-ce}\n")
+# Region boundaries in MK026569 coordinates. CDS = 180..1373 (GenBank). The
+# 5' element runs into MK026569 to ~65 (shown below), so 1..65 is grouped with
+# the overhang. Indels between records are ignored (all are 96-99% identical).
+def region(m):
+    return ("5' element" if m <= 65 else "viral 5' UTR" if m < 180 else
+            "RdRp CDS" if m <= 1373 else "viral 3' UTR" if m <= 1770 else "3' overhang")
+with open("hits_mk.tsv", "w") as o:
+    o.write("sample\tcontig\tref\tpident\tlength\tmk_start\tmk_end\tregion\n")
+    for f in glob.glob(os.environ["NSV"] + "/blast/*.tsv"):
+        s = os.path.basename(f).split(".north_shore_virus")[0]
+        for l in open(f):
+            if l.startswith("qaccver"): continue
+            a = l.split("\t")
+            if a[6] != os.environ["TAXID"]: continue
+            st, e = sorted((int(a[13]), int(a[14])))
+            cs, ce, ms, L, p = core[a[1]]
+            m1, m2 = st - cs + ms, e - cs + ms
+            o.write(f"{s}\t{a[0]}\t{a[1]}\t{a[7]}\t{a[8]}\t{m1}\t{m2}\t{region((m1+m2)/2)}\n")
+EOF
+column -t ref_core.tsv
+```
+
+```{r}
+#| label: fig-depth
+#| fig-cap: "Hit depth along the North shore virus segment, in MK026569 coordinates (positions ≤ 0 are 5′ overhang present only in the OL records; > 1,770 is 3′ overhang). Shaded: the RdRp CDS. Almost all hits pile up on the 5′ element; a smaller peak sits at the 3′ end of MK026569; the CDS is barely touched."
+#| fig-width: 9
+#| fig-height: 4.5
+hm <- rd("hits_mk.tsv")
+depth <- hm |> rowwise() |> reframe(pos = seq(mk_start, mk_end)) |> count(pos, name = "hits")
+# positions with no hit must be explicit zeros, or geom_area bridges the gaps
+depth <- complete(depth, pos = full_seq(pos, 1), fill = list(hits = 0L))
+ggplot(depth, aes(pos, hits)) +
+  annotate("rect", xmin = 180, xmax = 1373, ymin = 0, ymax = Inf, fill = col_main, alpha = 0.08) +
+  annotate("text", x = 776, y = max(depth$hits) * 0.9, label = "RdRp CDS", colour = "grey30") +
+  geom_vline(xintercept = c(0.5, 1770.5), linetype = 3, colour = "grey50") +
+  geom_area(fill = col_main, alpha = 0.85) +
+  scale_y_sqrt(labels = scales::label_comma()) +
+  labs(x = "Position (MK026569 coordinates)", y = "BLAST hits covering position (sqrt)")
+```
+
+```{r}
+#| label: region-table
+#| code-summary: "Hits and contigs per region; one region per contig by priority"
+lev <- c("RdRp CDS", "viral 5' UTR", "viral 3' UTR", "3' overhang", "5' element")
+hm |> group_by(region) |>
+  summarise(hits = n(), contigs = n_distinct(paste(sample, contig)), samples = n_distinct(sample),
+            median_hit_len = median(length)) |>
+  arrange(match(region, lev)) |> kable(format.args = list(big.mark = ","),
+                                     caption = "Every hit, by region of the NSV segment it lands on")
+# one class per contig: CDS wins (a contig with any CDS hit is a candidate virus),
+# otherwise the region with most hits
+contig_class <- hm |> count(sample, contig, region) |>
+  group_by(sample, contig) |>
+  summarise(class = if (any(region == "RdRp CDS")) "RdRp CDS" else region[which.max(n)], .groups = "drop")
+contig_class |> left_join(select(md, sample_id, tick_genus), by = c("sample" = "sample_id")) |>
+  count(class, tick_genus) |> pivot_wider(names_from = tick_genus, values_from = n, values_fill = 0) |>
+  arrange(match(class, lev)) |> kable(caption = "Contigs per class, by tick genus")
+```
+
+# Which contigs are actually viral?
+
+## Protein-level search
+
+This uses the RdRp proteins of all 23 hit records plus MW741889 (a third, independent NSV
+RdRp), searched with tblastn against all 10,390 contigs.
+
+```{bash}
+#| label: tblastn
+#| code-summary: "tblastn of NSV RdRp proteins against every assigned contig"
+cd "$W"
+if [ ! -s nsvdb.nsq ]; then
+  for f in "$NSV"/fasta/*.fasta; do
+    s=$(basename "$f" .north_shore_virus.fasta)
+    seqkit replace -p '^' -r "${s}|" "$f" 2>/dev/null     # prefix sample name to contig id
+  done > all_nsv.fa
+  makeblastdb -in all_nsv.fa -dbtype nucl -out nsvdb > /dev/null
+fi
+seqkit stats -T all_nsv.fa
+OF='6 qseqid sseqid pident length qstart qend sstart send evalue bitscore'
+tblastn -query ncbi/nsv_prot.fa -db nsvdb -evalue 1e-3 -seg no -outfmt "$OF" -num_threads 2 > tbn_strict.tsv
+echo "contigs with an RdRp hit at e <= 1e-3:"; cut -f2 tbn_strict.tsv | sort -u
+```
+
+The same 9 contigs are found by both routes: the nucleotide hits inside the CDS and the
+protein search. Nothing else in the 10,390 contigs encodes NSV protein.
+
+## The nine genuine contigs
+
+```{bash}
+#| label: genuine
+#| code-summary: "Coverage of MK026569, reading frames and non-viral hits for the 9 contigs"
+cd "$W"
+cut -f2 tbn_strict.tsv | sort -u > cds.ids
+seqkit grep -f cds.ids all_nsv.fa > cds_contigs.fa 2>/dev/null
+echo "== alignment to MK026569 (best HSP per contig) =="
+blastn -task blastn -query cds_contigs.fa -subject mk.fa -evalue 1e-5 \
+       -outfmt '6 qseqid qlen pident length qstart qend sstart send' |
+  sort -k1,1 -k4,4nr | awk '!s[$1]++' | column -t
+echo; echo "== tblastn vs MK026569 RdRp: stop codons in the aligned translation =="
+seqkit grep -r -p MK026569 ncbi/nsv_prot.fa > mk_prot.fa 2>/dev/null
+tblastn -query mk_prot.fa -subject cds_contigs.fa -evalue 1e-3 -seg no \
+        -outfmt '6 sseqid pident length qstart qend sframe sseq' |
+  sort -k1,1 -k3,3nr | awk -F'\t' '!s[$1]++{n=gsub(/\*/,"*",$7); print $1"\t"$2"%\t"$3"aa\tRdRp "$4"-"$5"\tframe "$6"\tstops "n}' | column -t
+echo; echo "== non-viral BLAST hits on these contigs =="
+grep -F -f <(sed 's/.*|//' cds.ids) allhits.tsv | awk -F'\t' -v t="$TAXID" '$7!=t' | wc -l
+```
+
+```{r}
+#| label: genuine-meta
+#| code-summary: "Samples carrying genuine NSV"
+data.frame(id = readLines(file.path(W, "cds.ids"))) |>
+  mutate(sample = sub("\\|.*", "", id)) |> count(sample, name = "contigs") |>
+  left_join(select(md, sample_id, tick_species, life_stage, host_species, collection_site),
+            by = c("sample" = "sample_id")) |> kable()
+```
+
+All 9 contigs share these features:
+
+- **Viral from end to end.** The whole contig aligns to MK026569, and there are no
+  non-viral hits.
+- **Low coverage.** k-mer coverage is 0.1–2.2×, as expected for RNA carried over into a
+  DNA extract.
+- ***Ixodes* only.** They come from four samples: two *I. holocyclus* (8143 and 8337,
+  the known NSV host), one *I. hirsti* and one *I. trichosuri*.
+- **Strain-level divergence.** The *I. holocyclus* contigs are 97–99.6% identical to
+  MK026569. The *I. hirsti* and *I. trichosuri* contigs are 91–93% (85–90% amino acid),
+  consistent with distinct strains or a related virus.
+- **Near-complete segment in 8337.** Its five contigs tile MK026569 positions ~26–1449.
+- **Intact reading frames.** The one exception is a single stop codon in a low-coverage
+  (0.47×) *I. trichosuri* contig, more likely a sequencing or assembly error than
+  pseudogenisation.
+
+Because these contigs carry no tick flanks, there is no junction. The simplest reading is
+genuine viral RNA. A complete, flank-less EVE cannot be strictly excluded from these data
+alone. The intact reading frames and the strain-level variation across three tick species
+argue against it.
+
+# The 5′ element: a tick repeat at the front of every reference
+
+## Every reference carries the same element
+
+```{bash}
+#| label: overhangs
+#| code-summary: "Extract each reference's 5'/3' overhang and compare them"
+cd "$W"
+python3 - <<'EOF' > overhangs.fa
+seq, n = {}, None
+for l in open("ncbi/jrefs.fa"):
+    l = l.strip()
+    if l.startswith(">"): n = l[1:].split()[0]; seq[n] = ""
+    else: seq[n] += l
+for l in list(open("ref_core.tsv"))[1:]:
+    acc, L, cs, ce = l.split("\t")[:4]; L, cs, ce = int(L), int(cs), int(ce)
+    if cs > 30:     print(f">{acc}_5ov_1-{cs-1}\n{seq[acc][:cs-1]}")
+    if L - ce > 30: print(f">{acc}_3ov_{ce+1}-{L}\n{seq[acc][ce:]}")
+EOF
+# probe = the longest 5' overhang (OL452120.1, 1-299)
+seqkit grep -r -p "OL452120.1_5ov" overhangs.fa > elem5.fa 2>/dev/null
+echo "5' overhangs: $(grep -c '_5ov' overhangs.fa); 3' overhangs: $(grep -c '_3ov' overhangs.fa)"
+echo "== each 5' overhang vs the OL452120 probe =="
+blastn -task blastn -query elem5.fa -subject overhangs.fa -evalue 1e-5 \
+       -outfmt '6 sseqid pident length' | grep _5ov | sort -u -k1,1 | column -t
+echo; echo "== first 120 nt of MK026569 (the 2018 record) =="
+seqkit subseq -r 1:120 mk.fa 2>/dev/null | tail -n +2 | tr -d '\n'; echo
+```
+
+All 17 records with a 5′ overhang carry the same element (85–100% identical). It always
+ends at the same place: immediately before MK026569 position ~2. MK026569 itself begins
+`GCCGGTGTCGGGAATCGAACCTGGG…`. Its `GGGAATCGAACC` is the reverse complement of the tRNA
+T-arm "B-box" (`GGTTCGAWTCC`), the hallmark of tRNA-derived SINE retrotransposons.
+
+## Copies, flanks and junctions in our contigs
+
+```{bash}
+#| label: element
+#| code-summary: "Map the 5' element onto all contigs; test for any element-virus junction"
+cd "$W"
+blastn -task blastn -query elem5.fa -db nsvdb -evalue 1e-5 -max_target_seqs 100000 \
+       -outfmt '6 sseqid slen sstart send qstart qend pident length' > elem5_hits.tsv
+echo "element copies: $(wc -l < elem5_hits.tsv) on $(cut -f1 elem5_hits.tsv | sort -u | wc -l) contigs"
+awk '{s=($3<$4)?$3:$4; e=($3<$4)?$4:$3; if(s<=20||e>=$2-20) a++; else b++} END{print "copies touching a contig end:",a," interior:",b}' elem5_hits.tsv
+
+# Where does tick-genome homology stop inside MK026569? Probe its first 600 nt.
+seqkit subseq -r 1:600 mk.fa 2>/dev/null > mk_head.fa
+blastn -task blastn -query mk_head.fa -db nsvdb -evalue 1e-5 -max_target_seqs 100000 \
+       -outfmt '6 sseqid sstart send qstart qend pident' > mk_head_hits.tsv
+cut -f1 elem5_hits.tsv | sort -u > e5.ids
+grep -v -F -f cds.ids mk_head_hits.tsv | cut -f1 | sort -u > mkhead_nongenuine.ids
+echo "non-genuine contigs hitting MK026569 1-600: $(wc -l < mkhead_nongenuine.ids); of which also carry the element: $(comm -12 e5.ids mkhead_nongenuine.ids | wc -l)"
+echo "furthest MK026569 position reached by those contigs: $(grep -v -F -f cds.ids mk_head_hits.tsv | awk '{if($5>m)m=$5}END{print m}')"
+echo "distribution of that end point (10-nt bins):"
+grep -v -F -f cds.ids mk_head_hits.tsv | awk '{print int($5/10)*10}' | sort -n | uniq -c | awk '{printf "  MK %s: %s\n",$2,$1}'
+```
+
+```{bash}
+#| label: e5-flanks
+#| code-summary: "Flank diversity on both sides of the element (cd-hit-est, 90%)"
+cd "$W"
+python3 - <<'EOF'
+seqs, name = {}, None
+for l in open("all_nsv.fa"):
+    l = l.strip()
+    if l.startswith(">"): name = l[1:].split()[0]; seqs[name] = []
+    else: seqs[name].append(l)
+seqs = {k: "".join(v) for k, v in seqs.items()}
+comp = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+# "up" = 150 bp before the element (away from the virus in the references);
+# "down" = 150 bp after the element's 3' end, i.e. where the VIRUS sits in the
+# references. Only copies that reach the probe's 3' end (>=290/299) count as "down".
+for side in ("up", "down"):
+    seen = set(); o = open(f"e5_{side}.fa", "w")
+    for l in open("elem5_hits.tsv"):
+        c, slen, ss, se, qs, qe = l.split("\t")[:6]
+        ss, se, slen, qe = int(ss), int(se), int(slen), int(qe)
+        if c in seen: continue
+        plus = ss < se
+        if side == "up":
+            if plus and ss > 150: f = seqs[c][ss - 151:ss - 1]
+            elif not plus and ss + 150 <= slen: f = seqs[c][ss:ss + 150][::-1].translate(comp)
+            else: continue
+        else:
+            if qe < 290: continue
+            if plus and se + 150 <= slen: f = seqs[c][se:se + 150]
+            elif not plus and se > 150: f = seqs[c][se - 151:se - 1][::-1].translate(comp)
+            else: continue
+        seen.add(c); o.write(f">{c}\n{f}\n")
+    print(f"{side}: {len(seen)} flanks")
+EOF
+for s in up down; do
+  cd-hit-est -i e5_$s.fa -o e5_${s}_c90 -c 0.9 -n 8 -T 2 -M 3000 -d 0 > /dev/null
+  echo "$s: $(grep -c '^>Cluster' e5_${s}_c90.clstr) clusters; largest: $(awk '/^>Cluster/{if(n)print n; n=0; next}{n++} END{print n}' e5_${s}_c90.clstr | sort -rn | head -4 | paste -sd' ')"
+done
+```
+
+The results:
+
+- **Copy number.** The element occurs ~9,300 times, on ~9,200 contigs.
+- **Viral side of the element.** In the references, the virus follows the element. In
+  our contigs, the 150 bp after the element are essentially **all different**: about
+  860 flanks form about 830 clusters.
+- **The other side.** The 150 bp before the element are also diverse: about 3,560
+  flanks form about 2,200 clusters.
+- **Where the homology stops.** In about 1,100 contigs, the tick-genome homology
+  continues into MK026569 but stops at position ~60–70 (never beyond ~100). So the
+  first ~65 nt of the 2018 record are the element too.
+- **No junction.** No contig joins the element on to NSV coding sequence.
+
+This is the signature of an interspersed repeat, such as a SINE, at many sites in the
+tick genome. It is not an integrated virus.
+
+## Genus distribution
+
+```{r}
+#| label: fig-genus
+#| fig-cap: "Copies of the 5′ element, by tick genus. Labels: samples with the element / samples sequenced."
+#| fig-width: 8
+#| fig-height: 4
+e5 <- read.delim(file.path(W, "elem5_hits.tsv"), header = FALSE)
+copies <- e5 |> mutate(sample_id = sub("\\|.*", "", V1)) |> count(sample_id, name = "copies")
+gtab <- md |> select(sample_id, tick_genus) |> left_join(copies, by = "sample_id") |>
+  mutate(copies = coalesce(copies, 0L)) |> group_by(tick_genus) |>
+  summarise(samples = n(), with_element = sum(copies > 0), copies = sum(copies)) |>
+  arrange(desc(copies))
+kable(gtab, format.args = list(big.mark = ","))
+ggplot(gtab, aes(reorder(tick_genus, copies), copies)) +
+  geom_col(fill = col_main, width = 0.7) +
+  geom_text(aes(label = sprintf("%d/%d", with_element, samples)), hjust = -0.15, size = 3.5) +
+  coord_flip(clip = "off") +
+  scale_y_continuous(labels = scales::label_comma(), expand = expansion(c(0, 0.15))) +
+  labs(x = NULL, y = "5′ element copies across all samples")
+```
+
+```{r}
+#| label: e5-cohits
+#| code-summary: "Non-viral subjects on element-bearing contigs"
+e5c <- unique(e5$V1)
+ah <- read.delim(file.path(W, "allhits.tsv"), header = FALSE, quote = "")
+names(ah) <- strsplit("qaccver saccver stitle sseqid ssciname scomname staxid pident length mismatch gapopen qstart qend sstart send evalue bitscore", " ")[[1]]
+cc_e5 <- cc |> filter(paste0(sample, "|", contig) %in% e5c)
+nv <- ah |> filter(staxid != 2485875, qaccver %in% cc_e5$contig)
+nv |> distinct(qaccver, ssciname) |> count(ssciname, sort = TRUE, name = "n_contigs") |> head(10) |>
+  kable(caption = "Non-viral taxa on element-bearing contigs (contig IDs are per-sample, so counts are approximate)")
+```
+
+The element is spread across *Amblyomma*, *Ixodes*, *Bothriocroton* and *Cryptocroton*.
+Its co-hits are predicted genes from metastriate tick genomes (*Dermacentor*,
+*Rhipicephalus*), some annotated as transposon-derived. It is essentially absent from
+all 34 *Haemaphysalis* samples, which is unexpected given how closely *Haemaphysalis* is
+related to *Amblyomma*. It could reflect lineage-specific loss or expansion of a SINE
+family, and is worth following up.
+
+This is **not** the same element as the Cheeloo Jingmen-like virus one:
+
+```{bash}
+#| label: vs-cjv
+#| code-summary: "Compare with the Cheeloo Jingmen-like virus element"
+cd "$W"
+blastn -task blastn -query elem5.fa -subject "$ROOT/extracting_pathogens/Cheeloo_Jingmen-like_virus/are_these_real/elem.fa" \
+       -evalue 10 -outfmt '6 pident length qstart qend sstart send evalue' | head -3
+echo "(no output above = no similarity at e <= 10)"
+```
+
+# The 3′ end of MK026569: a second, smaller element
+
+About 300 contigs hit the last ~120 nt of MK026569 (positions ~1650–1770), beyond the
+CDS. A further ~400 hit the 3′ overhangs of the OL records.
+
+```{bash}
+#| label: e3
+#| code-summary: "Probe MK026569 1374-1770 (3' UTR) against all contigs"
+cd "$W"
+seqkit subseq -r 1374:1770 mk.fa 2>/dev/null > mk3.fa
+blastn -task blastn -query mk3.fa -db nsvdb -evalue 1e-5 -max_target_seqs 100000 \
+       -outfmt '6 sseqid slen sstart send qstart qend pident length' | grep -v -F -f cds.ids > mk3_hits.tsv
+echo "copies: $(wc -l < mk3_hits.tsv) on $(cut -f1 mk3_hits.tsv | sort -u | wc -l) contigs (genuine contigs excluded)"
+echo "hit start in MK026569 coordinates (50-nt bins):"
+awk '{print int(($5+1373)/50)*50}' mk3_hits.tsv | sort -n | uniq -c | awk '{printf "  MK %s: %s\n",$2,$1}'
+awk '{print $2}' mk3_hits.tsv | sort -n | awk '{a[NR]=$1} END{print "contig length: median",a[int(NR/2)],"max",a[NR]}'
+awk '{print $8}' mk3_hits.tsv | sort -n | awk '{a[NR]=$1} END{print "hit length: median",a[int(NR/2)]}'
+echo "genus:"; cut -f1 mk3_hits.tsv | sed 's/|.*//' | sort | uniq -c | sort -rn |
+  awk 'NR==FNR{g[$1]=$5; next} {c[g[$2]]+=$1} END{for(k in c) print "  "k": "c[k]}' FS='\t' "$ROOT/metadata/sample_metadata.tsv" FS=' ' -
+```
+
+```{r}
+#| label: e3-cohits
+#| code-summary: "Non-viral subjects on 3'-element contigs"
+e3 <- read.delim(file.path(W, "mk3_hits.tsv"), header = FALSE)
+ah |> filter(staxid != 2485875, qaccver %in% sub(".*\\|", "", unique(e3$V1))) |>
+  distinct(qaccver, ssciname) |> count(ssciname, sort = TRUE, name = "n_contigs") |> head(8) |>
+  kable(caption = "Non-viral taxa on 3'-element contigs")
+```
+
+These are again short hits (median ~80 bp) inside longer contigs (median ~600 bp, up
+to 16.7 kb), restricted to *Ixodes*. Few contigs have non-viral co-hits, and those that
+do mostly hit tick genomes (*I. scapularis*, *Dermacentor*, *Rhipicephalus*). The 3′ end
+of MK026569 therefore also appears to carry ~100 nt of *Ixodes* repeat. This element is
+minor, and its flank diversity was not tested. It is less certain than the 5′ element:
+it could still be a genuine viral 3′ UTR with homology to an *Ixodes* repeat.
+
+# Open question: is the 5′ element part of the virus?
+
+Two independent assemblies begin with the same element: MK026569 (2018) and the 22 OL
+records (2021). Each of the 17 OL overhangs ends at exactly the same point. There are
+two readings:
+
+(a) **Assembly chimera (favoured).** A highly expressed tick SINE transcript shares a
+    short sequence with the NSV 5′ terminus, and Trinity bridges them. The same artefact
+    would then recur in every assembly from *I. holocyclus* RNA-seq, at the same
+    junction. The overhang lengths vary widely (3–300 nt) while the junction stays
+    fixed, which fits this.
+
+(b) **The virus genuinely carries the sequence.** NSV's 5′ UTR may itself contain a
+    SINE-like or tRNA-like sequence, captured from the host. That would make the tick
+    copies host repeats that are merely *related* to the viral UTR, not virus-derived
+    insertions.
+
+Neither reading changes the conclusion for our data. The 9,800 element-bearing contigs
+are tick genomic repeats, not NSV and not EVEs. The question can be settled with:
+
+- **Original read data.** Map the RNA-seq reads behind MK026569 and the OL records onto
+  them. A chimera shows a coverage step at the junction, and few or no read pairs span
+  it. A genuine UTR shows continuous coverage.
+- **5′ RACE** on NSV-positive *I. holocyclus* RNA, to define the true viral 5′ terminus.
+- **Repeat classification.** Search the element against an *I. holocyclus* or
+  *I. scapularis* genome assembly and Dfam, or run RepeatModeler/RepeatMasker, to name
+  the SINE family.
+
+# Conclusions
+
+1. **Genuine NSV is rare: 9 contigs in 4 *Ixodes* samples.** These are *I. holocyclus*
+   8143 and 8337, *I. hirsti* B5119 and *I. trichosuri* B6836. The contigs are viral
+   from end to end, have intact RdRp frames and are low-coverage, consistent with
+   co-extracted viral RNA. The *I. hirsti* and *I. trichosuri* sequences are divergent
+   (91–93% nt) and may be distinct strains.
+2. **The other ~10,380 "NSV" contigs are tick genomic repeats.** About 95% of them carry
+   a SINE-like element that sits at the 5′ end of every NSV reference record. A few
+   hundred *Ixodes* contigs carry a second element from the 3′ end of MK026569.
+3. **No evidence of NSV EVEs.** No tick-genomic contig contains viral coding sequence,
+   and no contig joins either element to the virus.
+4. **The reference records, not our data, hold the virus–repeat junction.** This is the
+   same kind of reference artefact as Cheeloo Jingmen-like virus, but with a different
+   element and a different genus range.
+
+::: {.callout-warning}
+## Implications for the pipeline and reporting
+
+- Report NSV only for 8143, 8337-Iholo-Xbtp-Awzh, B5119_F1_S15 and B6836_N1_S13 (or,
+  more generally, contigs with RdRp protein support).
+- Before LCA, mask the 5′ overhangs and MK026569 positions 1–~100 and 1650–1770 (or the
+  whole UTRs) in the NSV references. Otherwise, require protein-level support for any
+  viral call.
+- Several of these references are our own (Gofton, CSIRO, 2021). Consider submitting
+  trimmed versions, or adding a note to the records.
+:::
+
+# Files and versions
+
+All intermediate files are in `are_these_real/` beside this document. The extraction
+outputs (`fasta/`, `blast/`, `ids/`, `summary.tsv`, `lca_assignments.tsv`, `extract.log`)
+are in this directory.
+
+| File | Contents |
+|---|---|
+| `allhits.tsv`, `jhits.tsv` | all BLAST hits for the assigned contigs; NSV subset |
+| `contig_cov.tsv` | per-contig viral vs non-viral hit coverage |
+| `ncbi/` | reference records and proteins fetched from NCBI |
+| `core_vs_mk.tsv`, `ref_core.tsv` | each reference aligned to MK026569; its core and overhangs |
+| `hits_mk.tsv` | every NSV hit in MK026569 coordinates, with region |
+| `all_nsv.fa`, `nsvdb.*` | all assigned contigs (sample-prefixed) and BLAST db |
+| `tbn_strict.tsv`, `cds.ids`, `cds_contigs.fa` | tblastn results; the 9 genuine contigs |
+| `overhangs.fa`, `elem5.fa`, `elem5_hits.tsv` | reference overhangs; 5′ element probe and its copies |
+| `mk_head_hits.tsv` | hits of MK026569 1–600 (junction test) |
+| `e5_up*`, `e5_down*` | element flanks and cd-hit-est clusters |
+| `mk3.fa`, `mk3_hits.tsv` | MK026569 3′ UTR probe and its copies |
+
+```{bash}
+#| label: versions
+#| code-summary: "Tool versions"
+blastn -version | head -1; cd-hit-est -h 2>&1 | head -1; seqkit version; python3 --version
+```
+
+```{r}
+#| label: session
+sessionInfo()
+```

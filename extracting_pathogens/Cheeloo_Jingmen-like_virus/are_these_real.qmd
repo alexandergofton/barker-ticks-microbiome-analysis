@@ -1,0 +1,581 @@
+---
+title: "Are the Cheeloo Jingmen-like virus contigs real?"
+subtitle: "Testing whether contigs assigned to Cheeloo Jingmen-like virus are viral, endogenous viral elements, or something else"
+author: "Alexander Gofton"
+date: today
+date-format: "D MMMM YYYY"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    code-fold: true
+    code-summary: "Show the code"
+    code-tools: true
+    code-overflow: scroll
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+    callout-appearance: simple
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+::: {.callout-important}
+## Conclusion in one paragraph
+
+The 16,699 contigs that the BLAST/LCA step assigned to *Cheeloo Jingmen-like virus*
+(taxid 3064049) are **not viral**. They are also **not endogenous viral elements**:
+none of them encodes any detectable jingmenvirus protein. Every nucleotide hit lands on
+the first ~286 bp of the GenBank reference records, upstream of their coding sequence.
+That ~222 bp region is a **tick genomic interspersed repeat**. It occurs in ~11,000
+copies across these contigs, in highly diverse flanking contexts. It is almost
+exclusive to *Haemaphysalis* (32 of 34 samples; 10,425 of 10,988 copies). The reference
+"MAG" records were assembled with Trinity from *Haemaphysalis longicornis* RNA-seq.
+They appear to be **chimeras**: tick repeat (positions ~1–222) fused onto the front of a
+genuine viral segment (from ~position 225 onwards). So the virus–tick junction we set out
+to find exists, but it is in the reference sequences, not in our contigs.
+:::
+
+# Background and question
+
+The LCA step assigned contigs from many samples to *Cheeloo Jingmen-like virus*, a
+segmented, positive-sense RNA virus (*Flaviviridae*-like jingmenviruses). Our libraries
+were made from **DNA extracts** (without RNase treatment), so an RNA virus should be
+under-represented or absent. The hypotheses tested here:
+
+1. **Real virus.** The contigs are viral RNA carried through the DNA extraction.
+2. **Endogenous viral element (EVE).** Viral sequence integrated into the tick genome.
+   We would expect viral coding sequence flanked by tick DNA, with a visible junction.
+3. **Something else.** For example a mis-assigned tick sequence.
+
+Lines of evidence used:
+
+- contig length vs viral-hit length;
+- co-occurring tick hits in the existing BLAST records;
+- where the hits fall on the reference genomes;
+- protein-level (tblastn) search for viral genes;
+- copy number, position and flank diversity of the shared element;
+- distribution across tick genera;
+- comparison of the element with the Jingmen tick virus RefSeq.
+
+```{r}
+#| label: setup
+#| code-summary: "Set-up: paths, tool locations and plotting helpers"
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(knitr)
+
+ROOT <- "/data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis"
+CJV  <- file.path(ROOT, "extracting_pathogens/Cheeloo_Jingmen-like_virus")
+W    <- file.path(CJV, "are_these_real")          # all intermediate files land here
+dir.create(file.path(W, "ncbi"), recursive = TRUE, showWarnings = FALSE)
+
+# Bash chunks inherit these. BLAST+, cd-hit and python3 come from the base
+# miniforge install; seqkit is the system copy.
+Sys.setenv(ROOT = ROOT, CJV = CJV, W = W,
+           PATH = paste("/data/hb-austick/work/miniforge3/bin", "/usr/bin",
+                        Sys.getenv("PATH"), sep = ":"))
+
+col_main <- "#014B87"   # CSIRO Ocean Blue
+col_alt  <- "#E87721"   # CSIRO Orange
+theme_set(theme_minimal(base_size = 12) +
+          theme(panel.grid.minor = element_blank(),
+                plot.title.position = "plot"))
+rd <- function(f, ...) read.delim(file.path(W, f), check.names = FALSE, ...)
+```
+
+# How the contigs were assigned
+
+Upstream, every SPAdes contig was searched with `blastn` (megablast, the default task)
+against NCBI nt (2025-05-04 snapshot), using `-max_target_seqs 10 -evalue 1e-5`
+(`code/blast.slurm.sh`). An LCA was then computed per contig. The script
+`extract_cheeloo_jingmen.sh` pulled every contig with LCA = taxid 3064049, together with
+**all** its BLAST hits (not only the viral ones).
+
+::: {.callout-note}
+`-max_target_seqs 10` matters here. When 10 near-identical viral reference records
+out-score a tick hit, they take all 10 slots, so the tick hit never gets reported. A
+**missing** tick hit in these records is therefore weak evidence. A **present** tick hit
+is informative.
+:::
+
+```{bash}
+#| label: show-extract
+#| code-summary: "The extraction script and the upstream BLAST command"
+cat "$CJV/extract_cheeloo_jingmen.sh"
+echo; echo "---- code/blast.slurm.sh (BLAST call) ----"
+sed -n '/^  blastn/,/evalue/p' "$ROOT/code/blast.slurm.sh"
+```
+
+```{r}
+#| label: summary-table
+#| code-summary: "Per-sample extraction summary"
+summ <- read.delim(file.path(CJV, "summary.tsv"))
+cat(sprintf("%d samples, %s contigs, %s bp, %s BLAST hits\n", nrow(summ),
+            format(sum(summ$n_contigs), big.mark = ","),
+            format(sum(summ$total_bp), big.mark = ","),
+            format(sum(summ$n_blast_hits), big.mark = ",")))
+kable(arrange(summ, desc(total_bp)), format.args = list(big.mark = ","))
+```
+
+The first warning sign is the scale. A complete jingmenvirus genome is ~11 kb across four
+segments, yet single samples carry up to **3 Mb** of "viral" contigs.
+
+# Contig length vs viral-hit length
+
+For each contig, the script below takes the union of query intervals hit by
+Cheeloo Jingmen-like virus subjects (`jingmen_bp`), the union hit by any other subject
+(`other_bp`), and the part of the latter that lies outside the viral interval
+(`other_only_bp`).
+
+```{bash}
+#| label: per-contig-coverage
+#| code-summary: "Per-contig viral vs non-viral hit coverage (python)"
+cd "$W"
+cat "$CJV"/blast/*.tsv | grep -v '^qaccver' > allhits.tsv
+awk -F'\t' '$7=="3064049"' allhits.tsv > jhits.tsv
+
+python3 - <<'EOF'
+import collections, re
+J = "3064049"
+q = collections.defaultdict(lambda: {"j": set(), "o": set(), "ot": set(), "samp": None})
+# allhits.tsv has no sample column; recover it from the per-sample files instead
+import glob, os
+for f in glob.glob(os.environ["CJV"] + "/blast/*.tsv"):
+    s = os.path.basename(f).split(".Cheeloo")[0]
+    for ln in open(f):
+        if ln.startswith("qaccver"): continue
+        a = ln.rstrip("\n").split("\t")
+        qs, qe = sorted((int(a[11]), int(a[12])))
+        d = q[(s, a[0])]
+        if a[6] == J: d["j"].update(range(qs, qe + 1))
+        else:
+            d["o"].update(range(qs, qe + 1)); d["ot"].add(a[4])
+with open("contig_cov.tsv", "w") as o:
+    o.write("sample\tcontig\tlen\tkmer_cov\tjingmen_bp\tjingmen_frac\tother_bp\t"
+            "other_only_bp\tj_start\tj_end\tother_taxa\n")
+    for (s, c), d in q.items():
+        L = int(re.search(r"length_(\d+)", c).group(1))
+        cov = float(re.search(r"cov_([\d.]+)", c).group(1))
+        jb = len(d["j"])
+        o.write("\t".join(map(str, [s, c, L, cov, jb, round(jb / L, 4), len(d["o"]),
+                len(d["o"] - d["j"]), min(d["j"]) if d["j"] else 0,
+                max(d["j"]) if d["j"] else 0, ";".join(sorted(d["ot"]))])) + "\n")
+print("contigs written:", len(q))
+EOF
+```
+
+```{r}
+#| label: fig-len-vs-hit
+#| fig-cap: "Contig length vs the length covered by Cheeloo Jingmen-like virus hits. The dashed line is y = x (a contig entirely covered by viral hits). Viral hits never exceed 656 bp, however long the contig."
+#| fig-width: 8
+#| fig-height: 5
+cc <- rd("contig_cov.tsv") |>
+  mutate(tick = ifelse(other_bp > 0, "Also has a non-viral (mostly tick) hit",
+                       "Viral hits only"))
+ggplot(cc, aes(len, jingmen_bp, colour = tick)) +
+  geom_point(size = 0.8, alpha = 0.5) +
+  geom_abline(linetype = 2, colour = "grey50") +
+  scale_x_log10(labels = scales::label_comma()) +
+  scale_y_log10(labels = scales::label_comma()) +
+  scale_colour_manual(values = c(col_alt, col_main), name = NULL) +
+  labs(x = "Contig length (bp, log)", y = "bp covered by viral hits (log)") +
+  theme(legend.position = "top")
+```
+
+```{r}
+#| label: len-bins
+#| code-summary: "Viral fraction of contig, by contig length"
+cat(sprintf("Viral hit span: median %d bp, max %d bp. Contig length: median %d, max %s bp.\n",
+            median(cc$jingmen_bp), max(cc$jingmen_bp), median(cc$len),
+            format(max(cc$len), big.mark = ",")))
+cc |>
+  mutate(length_bin = cut(len, c(0, 500, 1000, 2000, 5000, Inf), dig.lab = 6,
+                          right = FALSE)) |>
+  group_by(length_bin) |>
+  summarise(n_contigs = n(),
+            median_viral_fraction = round(median(jingmen_frac), 2),
+            with_nonviral_hit = sum(other_bp > 0)) |>
+  kable()
+cc |> arrange(desc(len)) |> head(15) |>
+  select(sample, len, kmer_cov, j_start, j_end, jingmen_bp, other_only_bp, other_taxa) |>
+  kable(caption = "The 15 longest contigs: a ~200 bp viral hit inside contigs of up to 25 kb")
+```
+
+The viral hit is a short, stereotyped ~200–222 bp block. The longer the contig, the
+smaller the fraction it covers. That is what we would expect if a short element sits
+inside longer genomic sequence, not from viral genomes.
+
+# Co-occurring tick hits in the existing BLAST records
+
+```{r}
+#| label: tick-hits
+#| code-summary: "Non-viral subjects on the same contigs"
+ah <- read.delim(file.path(W, "allhits.tsv"), header = FALSE, quote = "")
+names(ah) <- strsplit("qaccver saccver stitle sseqid ssciname scomname staxid pident length mismatch gapopen qstart qend sstart send evalue bitscore", " ")[[1]]
+nv <- filter(ah, staxid != 3064049)
+cat(sprintf("%d of %d contigs (%.1f%%) also have a non-viral hit; %d have >=50 bp of non-viral hit outside the viral interval.\n",
+            sum(cc$other_bp > 0), nrow(cc), 100 * mean(cc$other_bp > 0),
+            sum(cc$other_only_bp >= 50)))
+nv |> distinct(qaccver, ssciname) |> count(ssciname, sort = TRUE, name = "n_contigs") |>
+  head(15) |> kable(caption = "Non-viral taxa, counted once per contig")
+nv |> distinct(qaccver, stitle) |> mutate(stitle = substr(stitle, 1, 90)) |>
+  count(stitle, sort = TRUE, name = "n_contigs") |> head(10) |>
+  kable(caption = "Most frequent non-viral subject records")
+```
+
+About 6% of contigs also hit tick sequences, mainly a single *Dermacentor silvarum*
+predicted mRNA (annotated "inositol polyphosphate 1-phosphatase"). The *Myotis* bat
+chromosome hits come from a few contigs and were not followed up. Given the 10-target
+cap, this 6% is a lower bound.
+
+# Where the hits fall on the reference genomes
+
+```{bash}
+#| label: fetch-refs
+#| code-summary: "Fetch the 38 reference records (FASTA, GenBank, CDS proteins) from NCBI"
+# The nt snapshot used for BLAST is not mounted on this machine, so the public
+# records are fetched from NCBI E-utilities. Cached: only fetched if absent.
+cd "$W"
+cut -f2 jhits.tsv | sort -u > jrefs.ids
+ids=$(paste -sd, jrefs.ids)
+E="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore"
+[ -s ncbi/jrefs.fa ]   || curl -s "$E&id=$ids&rettype=fasta&retmode=text"        > ncbi/jrefs.fa
+[ -s ncbi/jrefs.gb ]   || curl -s "$E&id=$ids&rettype=gb&retmode=text"           > ncbi/jrefs.gb
+[ -s ncbi/jprot.fa ]   || curl -s "$E&id=$ids&rettype=fasta_cds_aa&retmode=text" > ncbi/jprot.fa
+# Jingmen tick virus RefSeq, all four segments, as an independent reference
+J="NC_024111.1,NC_024112.1,NC_024113.1,NC_024114.1"
+[ -s ncbi/jmtv.fa ]      || curl -s "$E&id=$J&rettype=fasta&retmode=text"        > ncbi/jmtv.fa
+[ -s ncbi/jmtv_prot.fa ] || curl -s "$E&id=$J&rettype=fasta_cds_aa&retmode=text" > ncbi/jmtv_prot.fa
+echo "reference records: $(grep -c '>' ncbi/jrefs.fa)"
+echo "reference lengths: $(seqkit fx2tab -n -l ncbi/jrefs.fa | awk -F'\t' '{print $NF}' | sort -n | sed -n '1p;$p' | paste -sd- )"
+grep -m1 -A2 "^REFERENCE   1" ncbi/jrefs.gb; grep -m1 "Assembly Method" ncbi/jrefs.gb
+grep -m1 '/host=' ncbi/jrefs.gb; grep -m1 '/mol_type=' ncbi/jrefs.gb
+```
+
+```{r}
+#| label: fig-subject-pos
+#| fig-cap: "Where on the reference records the ~88,000 viral hits fall (subject coordinates), against the CDS starts annotated in those records (each record has two: glycoprotein at ~270–490 and VP1b at ~1,650–1,860). No hit reaches a coding sequence."
+#| fig-width: 8
+#| fig-height: 4
+jh <- read.delim(file.path(W, "jhits.tsv"), header = FALSE, quote = "")
+jh$s_lo <- pmin(jh$V14, jh$V15); jh$s_hi <- pmax(jh$V14, jh$V15)
+gb <- readLines(file.path(W, "ncbi/jrefs.gb"))
+cds <- as.integer(sub("^\\s+CDS\\s+(complement\\()?<?(\\d+).*", "\\2",
+                      grep("^\\s+CDS\\s", gb, value = TRUE)))
+cat(sprintf("Viral hits: n = %s; subject coordinates %d-%d. Earliest annotated CDS start in any reference: %d.\n",
+            format(nrow(jh), big.mark = ","), min(jh$s_lo), max(jh$s_hi), min(cds)))
+# The global ranges overlap slightly (286 vs 271), so test each record against
+# its OWN first CDS start.
+acc <- sub("^VERSION\\s+(\\S+).*", "\\1", grep("^VERSION", gb, value = TRUE))
+rec <- cumsum(grepl("^VERSION", gb))
+keep <- rec > 0                                    # drop LOCUS..DEFINITION lines before 1st VERSION
+first_cds <- tapply(seq_along(gb)[keep], rec[keep], function(i) {
+  l <- grep("^\\s+CDS\\s", gb[i], value = TRUE)[1]
+  as.integer(sub("^\\s+CDS\\s+(complement\\()?<?(\\d+).*", "\\2", l)) })
+per_ref <- jh |> group_by(acc = V2) |> summarise(max_hit_end = max(s_hi), n_hits = n()) |>
+  left_join(data.frame(acc = acc, cds_start = as.integer(first_cds)), by = "acc") |>
+  mutate(gap_to_cds = cds_start - max_hit_end)
+cat(sprintf("Records where any hit reaches that record's own CDS: %d of %d. Smallest gap between hit end and CDS start: %d bp.\n",
+            sum(per_ref$gap_to_cds <= 0), nrow(per_ref), min(per_ref$gap_to_cds)))
+pos <- bind_rows(data.frame(x = jh$s_hi, what = "End of viral hit on reference"),
+                 data.frame(x = cds, what = "Annotated CDS start"))
+ggplot(pos, aes(x, fill = what)) +
+  geom_histogram(binwidth = 20, boundary = 0, colour = "white", linewidth = 0.3) +
+  facet_wrap(~what, ncol = 1, scales = "free_y") +
+  scale_fill_manual(values = c(col_alt, col_main), guide = "none") +
+  labs(x = "Position on reference record (bp)", y = "Count")
+```
+
+All 38 records are *MAG: Cheeloo Jingmen-like virus* entries, assembled with Trinity
+from *H. longicornis* RNA-seq (Ye et al. 2024, *Microbiome* 12:35). Each one covers
+only the glycoprotein/VP1b segment. Every one of our hits lies in reference positions
+1–286. Within each record, the last hit ends at least 195 bp before that record's first
+CDS. **None of our contigs matches the viral coding sequence at the nucleotide level.**
+
+# Do any contigs encode jingmenvirus proteins?
+
+This is the decisive test. Any real virus, or any EVE large enough to be called viral,
+should show protein similarity. The queries were:
+
+- the glycoprotein and VP1b proteins from all 38 reference records;
+- all proteins from the four segments of the Jingmen tick virus RefSeq (NS5-like
+  RdRp, NS3-like helicase/protease, glycoprotein, capsid), which are the most
+  conserved jingmenvirus proteins.
+
+These were searched with tblastn against all 16,699 contigs, with low-complexity
+filtering off.
+
+```{bash}
+#| label: tblastn
+#| code-summary: "tblastn of jingmenvirus proteins against every assigned contig"
+cd "$W"
+F="$CJV/fasta"
+if [ ! -s all_cjv.fa ]; then
+  for f in "$F"/*.fasta; do
+    s=$(basename "$f" .Cheeloo_Jingmen-like_virus.fasta)
+    seqkit replace -p '^' -r "${s}|" "$f"          # prefix sample name to contig id
+  done > all_cjv.fa
+  makeblastdb -in all_cjv.fa -dbtype nucl -out cjvdb > /dev/null
+fi
+seqkit stats -T all_cjv.fa
+cat ncbi/jprot.fa ncbi/jmtv_prot.fa > allprot.fa
+echo "query proteins:"; grep '>' allprot.fa | grep -o 'protein=[^]]*' | sort | uniq -c
+OF='6 qseqid sseqid pident length qstart qend sstart send evalue bitscore'
+tblastn -query allprot.fa -db cjvdb -evalue 1e-3 -seg no -outfmt "$OF" -num_threads 2 > tbn_strict.tsv
+tblastn -query allprot.fa -db cjvdb -evalue 10   -seg no -outfmt "$OF" -num_threads 2 > tbn_loose.tsv
+echo "hits at e <= 1e-3: $(wc -l < tbn_strict.tsv)"
+echo "hits at e <= 10:   $(wc -l < tbn_loose.tsv)"
+echo "best five hits at e <= 10:"; sort -t$'\t' -k9,9g tbn_loose.tsv | head -5
+```
+
+There are **zero** hits at e ≤ 1e-3. The best hit even at e ≤ 10 is e = 0.17 over 30
+amino acids, which is noise. No contig encodes recognisable jingmenvirus protein. That
+rules out a real virus, and it rules out an EVE in the usual sense (integrated viral
+coding sequence).
+
+# What is the shared element?
+
+Positions 1–300 of OR114895.1 (the most-hit record) were taken as a probe. It was
+searched against all contigs with sensitive `blastn -task blastn` and no hit cap.
+
+```{bash}
+#| label: element
+#| code-summary: "Map the 5' reference region onto all contigs"
+cd "$W"
+seqkit grep -r -p OR114895 ncbi/jrefs.fa | seqkit subseq -r 1:300 > elem.fa
+cat elem.fa
+blastn -task blastn -query elem.fa -db cjvdb -evalue 1e-5 -max_target_seqs 100000 \
+       -outfmt '6 sseqid slen sstart send qstart qend pident length' > elem_hits.tsv
+echo "element copies: $(wc -l < elem_hits.tsv) on $(cut -f1 elem_hits.tsv | sort -u | wc -l) contigs"
+echo "dust low-complexity intervals in the element:"; dustmasker -in elem.fa -outfmt interval | tail -n +2
+```
+
+```{r}
+#| label: element-stats
+#| code-summary: "Copy structure, probe end-point and position on contig"
+eh <- read.delim(file.path(W, "elem_hits.tsv"), header = FALSE,
+                 col.names = c("sseqid","slen","sstart","send","qstart","qend","pident","length"))
+eh <- eh |> mutate(lo = pmin(sstart, send), hi = pmax(sstart, send),
+                   at_end = lo <= 20 | hi >= slen - 20)
+kable(count(count(eh, sseqid), n, name = "n_contigs") |> rename(copies_per_contig = n))
+kable(head(count(eh, qend, sort = TRUE), 5),
+      caption = "Most common end-point on the probe: the element ends at reference position ~222")
+cat(sprintf("Copies touching a contig end (within 20 bp): %d of %d (%.0f%%)\n",
+            sum(eh$at_end), nrow(eh), 100 * mean(eh$at_end)))
+```
+
+The homology stops sharply at reference position **222** (and at 208/221 in related
+copies). That is a clean boundary. About 73% of copies sit at a contig end, which
+typically happens when a repeat breaks the assembly graph.
+
+## Flank diversity: one locus, a tandem array, or interspersed?
+
+If the element is a single locus, or a tandem array, its flanks will all be the same.
+If it is an interspersed repeat (for example a SINE or another transposable element),
+the flanks will vary. The 150 bp immediately upstream of each copy (strand-aware) was
+extracted and clustered at 90% identity.
+
+```{bash}
+#| label: flanks
+#| code-summary: "Extract upstream flanks and cluster with cd-hit-est"
+cd "$W"
+python3 - <<'EOF'
+seqs, name = {}, None
+for l in open("all_cjv.fa"):
+    l = l.strip()
+    if l.startswith(">"): name = l[1:].split()[0]; seqs[name] = []
+    else: seqs[name].append(l)
+seqs = {k: "".join(v) for k, v in seqs.items()}
+comp = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+seen = set()
+with open("lflank.fa", "w") as o:
+    for l in open("elem_hits.tsv"):
+        c, slen, ss, se = l.split("\t")[:4]
+        ss, se = int(ss), int(se)
+        if c in seen: continue                    # one flank per contig
+        if ss < se and ss > 150:                  # element on + strand
+            f = seqs[c][ss - 151:ss - 1]
+        elif ss > se and ss + 150 <= int(slen):   # element on - strand
+            f = seqs[c][ss:ss + 150][::-1].translate(comp)
+        else: continue
+        seen.add(c); o.write(f">{c}\n{f}\n")
+print("flanks extracted:", len(seen))
+EOF
+cd-hit-est -i lflank.fa -o lflank_c90 -c 0.9 -n 8 -T 2 -M 4000 -d 0 > /dev/null
+echo "clusters at 90% identity: $(grep -c '^>Cluster' lflank_c90.clstr)"
+echo "largest clusters:"; awk '/^>Cluster/{if(n)print n; n=0; next}{n++} END{print n}' lflank_c90.clstr | sort -rn | head -5 | paste -sd' '
+echo "singleton clusters: $(awk '/^>Cluster/{if(n)print n; n=0; next}{n++} END{print n}' lflank_c90.clstr | awk '$1==1' | wc -l)"
+```
+
+The flanks are highly diverse. 3,035 flanks form ~1,500 clusters, and ~1,050 of those
+are singletons. **The element sits in many unrelated genomic contexts: an interspersed
+repeat.** One large cluster (~800 flanks, about a quarter) shares a common upstream
+sequence. That probably marks a sub-family in which the ~222 bp element is the 3′ part of
+a longer repeat unit. It is worth classifying (see *Further tests*).
+
+# Distribution across tick genera
+
+```{r}
+#| label: fig-genus
+#| fig-cap: "Copies of the element, by tick genus (sample genus from metadata/sample_metadata.tsv). Labels show samples with the element / samples sequenced."
+#| fig-width: 8
+#| fig-height: 4
+md <- read.delim(file.path(ROOT, "metadata/sample_metadata.tsv"))
+copies <- eh |> mutate(sample_id = sub("\\|.*", "", sseqid)) |> count(sample_id, name = "copies")
+gen <- md |> select(sample_id, tick_genus, tick_species) |>
+  left_join(copies, by = "sample_id") |>
+  mutate(copies = coalesce(copies, 0L),
+         tick_genus = ifelse(is.na(tick_genus) | tick_genus == "", "(unrecorded)", tick_genus))
+gtab <- gen |> group_by(tick_genus) |>
+  summarise(samples = n(), with_element = sum(copies > 0), copies = sum(copies)) |>
+  arrange(desc(copies))
+kable(gtab, format.args = list(big.mark = ","))
+ggplot(gtab, aes(reorder(tick_genus, copies), copies)) +
+  geom_col(fill = col_main, width = 0.7) +
+  geom_text(aes(label = sprintf("%d/%d", with_element, samples)), hjust = -0.15, size = 3.5) +
+  coord_flip(clip = "off") +
+  scale_y_continuous(labels = scales::label_comma(), expand = expansion(c(0, 0.15))) +
+  labs(x = NULL, y = "Element copies across all samples")
+gen |> filter(copies > 0, tick_genus != "Haemaphysalis") |> arrange(desc(copies)) |>
+  kable(caption = "Non-Haemaphysalis samples carrying the element")
+```
+
+The element is essentially **Haemaphysalis-specific**, and the reference MAGs also come
+from a *Haemaphysalis* species (*H. longicornis*). The single unrecorded-genus sample (`8267`) with
+~550 copies should be checked: it may well be a *Haemaphysalis*. The handful of copies in
+*Amblyomma* and *Ixodes* samples could come from a related element, or from low-level
+cross-sample carry-over.
+
+```{r}
+#| label: no-element-samples
+#| code-summary: "LCA-assigned samples in which the element probe finds nothing"
+summ |> filter(!sample %in% copies$sample_id) |>
+  left_join(select(md, sample_id, tick_genus), by = c("sample" = "sample_id")) |>
+  kable(caption = "LCA-assigned samples with no copy of the OR114895 probe")
+```
+
+```{bash}
+#| label: no-element-hits
+#| code-summary: "What those contigs hit on the reference records"
+cd "$CJV"
+for s in $(tail -n +2 summary.tsv | cut -f1); do
+  grep -q "^$s|" "$W/elem_hits.tsv" && continue
+  tail -n +2 blast/$s.Cheeloo_Jingmen-like_virus.blast.tsv
+done | awk -F'\t' '{lo=($14<$15)?$14:$15; hi=($14<$15)?$15:$14; print $2"\t"$7"\t"lo"-"hi}' |
+  sort | uniq -c | sort -rn | head -10
+```
+
+These samples are mostly *Bothriocroton*. Their contigs hit a single record (OR114906.1),
+at positions ~14–108. That is again the non-coding 5′ region, upstream of the viral CDS,
+so it is probably a divergent copy of the same repeat (or a related one) that the
+OR114895 probe misses at e ≤ 1e-5. They are artefacts of the same kind.
+
+# The junction is in the reference records
+
+If positions 1–222 of the reference are tick repeat, then the true viral sequence should
+begin just after it. The jingmenvirus segment termini are conserved, so the probe was
+compared with all four Jingmen tick virus RefSeq segments.
+
+```{bash}
+#| label: junction
+#| code-summary: "Compare the probe with Jingmen tick virus RefSeq segments"
+cd "$W"
+echo "probe vs Jingmen tick virus RefSeq (all hits, e <= 10):"
+blastn -task blastn -query elem.fa -subject ncbi/jmtv.fa -evalue 10 \
+       -outfmt '6 sseqid pident length qstart qend sstart send evalue'
+echo; echo "probe vs the 38 Cheeloo references (e <= 1e-10): alignment length distribution"
+blastn -task blastn -query elem.fa -subject ncbi/jrefs.fa -evalue 1e-10 \
+       -outfmt '6 sseqid pident length sstart send' | awk '{print $3}' | sort -n | uniq -c | sort -rn | head -6
+```
+
+Probe positions 1–222 have **no** similarity to any Jingmen tick virus segment.
+Probe positions ~225–260 match the **extreme 5′ ends** of JMTV segments 2–4
+(e.g. 14/14 nt identity to segment 4, positions 21–34). That is the conserved
+jingmenvirus segment terminus. The reading of each Cheeloo reference record is therefore:
+
+```
+ 1                    ~222 ~225                ~290-490                          ~2,750
+ |---- tick repeat ----|    |-- viral 5' UTR --|==== glycoprotein / VP1b CDS ====|
+     (what all our contigs hit)    ^ conserved jingmenvirus terminus
+```
+
+This suggests the records are **assembly chimeras**: a *Haemaphysalis* repeat transcript
+joined onto a genuine viral segment by Trinity, in RNA-seq from the same tick species.
+The terminus match is short, so this junction position is well supported but not proven.
+Mapping the original reads (SRR24769044 for OR114895) onto the record would test it
+directly (see below).
+
+# Conclusions
+
+1. **Not a virus.** No contig encodes jingmenvirus protein. Hits are confined to a
+   non-coding ~222 bp region.
+2. **Not an EVE or retrovirus.** There is no viral coding sequence, no long-terminal
+   repeat signal, and no viral protein. What we see is a tick repeat, not virus-derived
+   DNA in the tick genome.
+3. **A *Haemaphysalis* interspersed repeat.** It has ~11,000 copies, diverse flanks,
+   frequent contig-end positions, matches to tick genomic and transcript sequences, and
+   is restricted to *Haemaphysalis*.
+4. **Reference contamination is the root cause.** The GenBank *Cheeloo Jingmen-like
+   virus* MAG records carry this repeat at their 5′ end, so megablast + LCA calls every
+   *Haemaphysalis* sample "Jingmen-positive".
+
+::: {.callout-warning}
+## Implications for the pipeline
+These LCA calls should not be reported as virus detections. Options:
+
+- mask positions 1–~286 of the 38 OR1148xx/OR1149xx records (or drop the records) before LCA;
+- require that any viral call is supported at the protein level (blastx/DIAMOND or
+  tblastn), which would also catch other reference-chimera artefacts;
+- treat absence of non-viral hits cautiously, because `-max_target_seqs 10` hides them.
+:::
+
+# Further tests (not yet done)
+
+- **Read-level support in the reference.** Map SRR24769044 onto OR114895 and look for a
+  coverage step, or a lack of spanning read pairs, at ~position 222–225.
+- **Read-level support in our data.** Map reads back to the long contigs and confirm
+  read pairs span the element–flank boundaries. This rules out an assembly artefact on
+  our side.
+- **Coverage ratio.** Compare depth over the element with depth over its flanks. A
+  collapsed repeat shows inflated depth.
+- **Repeat classification.** Search the element against a *H. longicornis* genome
+  assembly and Dfam, or run RepeatModeler/RepeatMasker, to name the repeat family
+  (e.g. SINE, tRNA-derived).
+- **Sliding-window homology.** This is no longer needed for boundary-finding, because
+  the HSP coordinates already give a sharp boundary. It would still be useful for
+  visualising individual long contigs.
+- **Wet lab.** RT-PCR vs no-RT PCR on RNA for genuine jingmenvirus segments, and
+  junction-spanning PCR on DNA.
+
+# Files and versions
+
+All intermediate files are in `are_these_real/` beside this document:
+
+| File | Contents |
+|---|---|
+| `allhits.tsv`, `jhits.tsv` | all BLAST hits for the assigned contigs; viral subset |
+| `contig_cov.tsv` | per-contig viral vs non-viral hit coverage |
+| `ncbi/` | reference records, proteins and Jingmen tick virus RefSeq fetched from NCBI |
+| `all_cjv.fa`, `cjvdb.*` | all assigned contigs (sample-prefixed) and BLAST db |
+| `tbn_strict.tsv`, `tbn_loose.tsv` | tblastn results (e ≤ 1e-3, e ≤ 10) |
+| `elem.fa`, `elem_hits.tsv` | the 300 bp probe and its copies on contigs |
+| `lflank.fa`, `lflank_c90*` | upstream flanks and cd-hit-est clusters |
+
+```{bash}
+#| label: versions
+#| code-summary: "Tool versions"
+blastn -version | head -1; cd-hit-est -h 2>&1 | head -1; seqkit version; python3 --version
+```
+
+```{r}
+#| label: session
+sessionInfo()
+```
