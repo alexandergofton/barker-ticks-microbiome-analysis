@@ -18,7 +18,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, canonical, find_reads, load_aliases, write_tsv  # noqa: E402
+from common import ROOT, canonical, find_reads, load_aliases, load_excluded, write_tsv  # noqa: E402
 
 
 def stems(directory: Path, suffixes: list[str]) -> dict[str, str]:
@@ -36,6 +36,7 @@ def stems(directory: Path, suffixes: list[str]) -> dict[str, str]:
 
 def main() -> None:
     aliases = load_aliases()
+    excluded = load_excluded()
     audit_dir = ROOT / "results" / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
 
@@ -101,6 +102,10 @@ def main() -> None:
             status, action = "excluded_no_blast", "terminal: no BLAST output"
         else:
             status, action = "unknown", "review manually"
+        # A decision to drop the sample (metadata/excluded_samples.tsv) overrides
+        # whatever the artefacts would allow.
+        if sid in excluded:
+            status, action = "excluded_manual", excluded[sid]
 
         rows.append({
             "sample_id": sid,

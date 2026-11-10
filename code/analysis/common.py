@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = ROOT / "config" / "analysis_params.yaml"
 ALIAS_PATH = ROOT / "metadata" / "sample_aliases.tsv"
 CONTAMINANT_PATH = ROOT / "metadata" / "reagent_contaminants.tsv"
+EXCLUDED_PATH = ROOT / "metadata" / "excluded_samples.tsv"
+REASSIGN_PATH = ROOT / "metadata" / "contig_reassignments.tsv"
 
 
 def load_config(path: Path | str = CONFIG_PATH) -> dict:
@@ -85,6 +87,40 @@ def resolve_artefact(sample: str, directory: Path | str, suffix: str,
         if p.exists():
             return p
     return None
+
+
+def load_excluded(path: Path | str = EXCLUDED_PATH) -> dict[str, str]:
+    """sample_id -> reason, for samples removed from every analysis by decision
+    (metadata/excluded_samples.tsv). Step 00 turns these into status
+    `excluded_manual`; steps that enumerate contigs/ directly must skip them."""
+    out: dict[str, str] = {}
+    if not Path(path).exists():
+        return out
+    with open(path) as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if parts[0] == "sample_id":
+                continue
+            out[parts[0].strip()] = parts[1].strip() if len(parts) > 1 else ""
+    return out
+
+
+def load_contig_reassignments(path: Path | str = REASSIGN_PATH) -> dict[str, dict[str, int]]:
+    """sample_id -> {contig_id: new_taxid}, from metadata/contig_reassignments.tsv.
+
+    Manual curation of contigs whose nt LCA is wrong (e.g. tick repeats carried
+    in viral reference records; see extracting_pathogens/*/are_these_real.html).
+    Applied on top of lca/<s>.blast.lca by steps 03 and 04; the LCA files
+    themselves are never edited."""
+    out: dict[str, dict[str, int]] = {}
+    if not Path(path).exists():
+        return out
+    with open(path) as fh:
+        for r in csv.DictReader(fh, delimiter="\t"):
+            out.setdefault(r["sample_id"], {})[r["contig_id"]] = int(r["new_taxid"])
+    return out
 
 
 def load_contaminants(path: Path | str = CONTAMINANT_PATH) -> dict[str, str]:

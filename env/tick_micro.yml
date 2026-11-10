@@ -32,3 +32,10 @@ dependencies:
   - r-pheatmap
   - r-RColorBrewer
   - r-ggrepel
+  # --- mitogenome phylogeny (code/analysis/26) ----------------------------
+  - r-ape          # tree I/O, dist.dna (pairwise-deletion genetic distance), cophenetic
+  - r-phangorn     # midpoint()
+  # --- tick genus/species comparison (10b) ------------------------------
+  - r-indicspecies # indicator genera per tick genus
+  # Maps (10c) and the Quarto report live in env/tick_report.yml -- see the
+  # note there on why sf/leaflet are NOT added to this env.

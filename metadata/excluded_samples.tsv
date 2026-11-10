@@ -1,0 +1,17 @@
+# Samples removed from EVERY analysis (microbiome, markers, trees, mitogenome).
+# Read by code/analysis/common.py:load_excluded(); step 00 gives each one the
+# status `excluded_manual`, which every downstream step honours, and step 21
+# (which reads contigs/ directly) skips them too. Files on disk are untouched.
+# Decided 2026-10-08 after the step-26c discordance audit
+# (results/mito/tables/mito_discordance_audit.tsv in the pre-exclusion run).
+sample_id	reason
+8184-F1-N1-3-Alimb	26c WRONG_TICK: curated Amblyomma; nuclear rRNA 97% Argas; mitogenome identical to 8302-Argusrobertsi (same lane)
+8188-M2-Afimb	26c WRONG_TICK: curated Amblyomma; nuclear rRNA 97% Argas
+B7002_1_F1_5_22_S9	26c WRONG_TICK: curated Ornithodoros; nuclear rRNA and mitogenome Ixodes holocyclus
+8225-3L1	26c MIXED_SAMPLE: 3 pooled larvae, Haemaphysalis + Ixodes tasmani (mitogenome identical to 8278-F1-Itasm)
+8316-B-F1-AmblyomaSP	26c WRONG_TICK: curated Amblyomma sp.; nuclear rRNA Rhipicentor/Rhipicephalus, mitogenome Dermacentor
+8187-F1-Afimb	26c CONTAMINANT_MITOGENOME: Amblyomma tick carrying 6700-10-CT-Hbanc's Haemaphysalis mitogenome (same lane)
+5121-M1-Alimb	26c CONTAMINANT_MITOGENOME: Amblyomma tick carrying a Haemaphysalis mitogenome
+B5053a_N1_1_14_S10	26c WRONG_TICK: curated Ixodes hirsti; nuclear rRNA and mitogenome Bothriocroton
+0643-M1-2-Bhydro	removed on review (user decision 2026-10-08)
+8261-F1-Atrig	26c CONTAMINANT_MITOGENOME: Amblyomma nuclear rRNA, Bothriocroton mitogenome

@@ -1,0 +1,29 @@
+# The 13 mitochondrial protein-coding genes (PCGs) plus the two ribosomal RNA
+# genes, used by the mitogenome workflow (code/analysis/20-26, run_mito.sh).
+#
+# One row per gene. `type` = pcg (translated with the invertebrate mitochondrial
+# genetic code, NCBI transl_table 5) or rrna. Every reference probe is fetched
+# at ORDER level (Ixodida = all ticks), because the sample set spans both
+# Ixodidae (hard ticks) and Argasidae (soft ticks) -- families separated by
+# >200 My, too divergent for a family- or genus-restricted probe to reliably
+# find both. tblastn on the well-conserved PCGs is what carries that span, not
+# nucleotide identity, which is why every pcg row is searched with tblastn
+# against a protein probe, never blastn.
+#
+# Edit this file to add/drop a gene; nothing is hardcoded in the scripts.
+gene	type	n_refs	min_aln_len	min_pident	query
+COX1	pcg	30	100	30	Ixodida[Organism] AND "cytochrome c oxidase subunit I"[Protein Name] AND srcdb_refseq[PROP] ||| Ixodida[Organism] AND "cytochrome c oxidase subunit 1"[Protein Name]
+COX2	pcg	30	80	30	Ixodida[Organism] AND "cytochrome c oxidase subunit II"[Protein Name] AND srcdb_refseq[PROP] ||| Ixodida[Organism] AND "cytochrome c oxidase subunit 2"[Protein Name]
+COX3	pcg	30	80	30	Ixodida[Organism] AND "cytochrome c oxidase subunit III"[Protein Name] AND srcdb_refseq[PROP] ||| Ixodida[Organism] AND "cytochrome c oxidase subunit 3"[Protein Name]
+CYTB	pcg	30	80	30	Ixodida[Organism] AND "cytochrome b"[Protein Name] AND srcdb_refseq[PROP]
+ND1	pcg	25	60	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 1"[Protein Name] AND srcdb_refseq[PROP]
+ND2	pcg	25	60	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 2"[Protein Name] AND srcdb_refseq[PROP]
+ND3	pcg	20	50	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 3"[Protein Name] AND srcdb_refseq[PROP]
+ND4	pcg	25	60	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 4"[Protein Name] AND srcdb_refseq[PROP]
+ND4L	pcg	20	40	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 4L"[Protein Name] AND srcdb_refseq[PROP]
+ND5	pcg	25	60	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 5"[Protein Name] AND srcdb_refseq[PROP]
+ND6	pcg	20	50	30	Ixodida[Organism] AND "NADH dehydrogenase subunit 6"[Protein Name] AND srcdb_refseq[PROP]
+ATP6	pcg	25	50	30	Ixodida[Organism] AND "ATP synthase F0 subunit 6"[Protein Name] AND srcdb_refseq[PROP] ||| Ixodida[Organism] AND "ATP synthase subunit 6"[Protein Name]
+ATP8	pcg	20	30	30	Ixodida[Organism] AND "ATP synthase F0 subunit 8"[Protein Name] AND srcdb_refseq[PROP] ||| Ixodida[Organism] AND "ATP synthase subunit 8"[Protein Name]
+rrnL	rrna	25	200	65	Ixodida[Organism] AND "16S ribosomal RNA"[Title] AND 500:1600[SLEN]
+rrnS	rrna	25	150	65	Ixodida[Organism] AND "12S ribosomal RNA"[Title] AND 300:1100[SLEN]

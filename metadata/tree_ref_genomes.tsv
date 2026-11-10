@@ -1,0 +1,43 @@
+# Whole-genome reference source, one row per target (code/analysis/17..19).
+#
+# WHY GENOMES. Several of the loci that actually resolve these genera --
+# Rickettsia sca4 and the 17 kDa antigen, Coxiella icd / dnaK / IS1111,
+# Francisella sdhA, everything in Rickettsiella and Midichloria -- have almost
+# no standalone gene records in GenBank. The named species that carry them
+# exist only inside complete genomes. Step 18 blasts the locus out of each
+# genome exactly as step 13 blasts it out of a contig, so one genome download
+# per target supplies a reference for EVERY locus of that target.
+#
+# The set is fetched once and cached under results/markers/trees/refs/genome/.
+# Fetching is the slow part of the workflow -- a Rickettsia genome is ~1.3 Mb
+# and this table asks for tens of them -- so keep n_genomes modest and let the
+# per-organism cap in config trees.curate spend it on breadth of species.
+#
+# For the piroplasms and Hepatozoon the "genome" is the MITOCHONDRIAL genome
+# (~6-8 kb), which is where cox1 and cytb live. For the viruses it is the
+# complete genome or segment record.
+#
+# COLUMNS
+#   target      must match a `target` in metadata/target_markers.tsv
+#   n_genomes   how many records to keep (after the per-organism cap)
+#   query       Entrez nuccore term; ' ||| ' separates fallbacks
+#
+# A target with no row here simply has no genome tier; its references come from
+# metadata/tree_references.tsv alone.
+target	n_genomes	query
+Rickettsia	20	Rickettsia[Organism] AND "complete genome"[Title] AND srcdb_refseq[PROP] AND 900000:2200000[SLEN] ||| Rickettsia[Organism] AND "complete genome"[Title] AND 900000:2200000[SLEN]
+Anaplasma	10	Anaplasma[Organism] AND "complete genome"[Title] AND 900000:2000000[SLEN]
+Coxiella	12	Coxiella[Organism] AND ("complete genome"[Title] OR "complete sequence"[Title]) AND 900000:2600000[SLEN]
+Francisella	12	Francisella[Organism] AND "complete genome"[Title] AND 1000000:2400000[SLEN]
+Borrelia	12	(Borrelia[Organism] OR Borreliella[Organism]) AND ("complete genome"[Title] OR "chromosome, complete sequence"[Title]) AND 700000:1700000[SLEN]
+Bartonella	10	Bartonella[Organism] AND "complete genome"[Title] AND 1200000:2800000[SLEN]
+Midichloria	5	(Midichloria[Organism] OR Midichloriaceae[Organism]) AND ("complete genome"[Title] OR "complete sequence"[Title]) AND 800000:2500000[SLEN]
+Rickettsiella	8	(Rickettsiella[Organism] OR Diplorickettsia[Organism]) AND ("complete genome"[Title] OR "complete sequence"[Title]) AND 800000:4000000[SLEN]
+Arsenophonus	6	Arsenophonus[Organism] AND ("complete genome"[Title] OR "complete sequence"[Title]) AND 2000000:6000000[SLEN]
+Babesia	25	(Babesia[Organism] OR Theileria[Organism]) AND mitochondrion[Title] AND ("complete genome"[Title] OR "complete sequence"[Title]) AND 4000:12000[SLEN]
+Cytauxzoon	25	(Cytauxzoon[Organism] OR Theileria[Organism] OR Babesia[Organism]) AND mitochondrion[Title] AND ("complete genome"[Title] OR "complete sequence"[Title]) AND 4000:12000[SLEN]
+Hepatozoon	15	(Hepatozoon[Organism] OR Hemolivia[Organism] OR Adelina[Organism]) AND mitochondrion[Title] AND 3000:12000[SLEN] ||| Hepatozoon[Organism] AND (cox1[Gene] OR "cytochrome c oxidase subunit I"[Title]) AND 300:12000[SLEN]
+Flaviviridae	25	(Jingmenvirus[Organism] OR "Jingmen tick virus"[All Fields] OR "Alongshan virus"[All Fields] OR "Yanggou tick virus"[All Fields]) AND "complete"[Title] AND 1000:6000[SLEN]
+Phenuiviridae	20	(Uukuvirus[Organism] OR Phlebovirus[Organism] OR Bandavirus[Organism]) AND "complete genome"[Title] AND 1000:8000[SLEN]
+Rhabdoviridae	20	Rhabdoviridae[Organism] AND "complete genome"[Title] AND 10000:16000[SLEN]
+Orthomyxoviridae	20	(Quaranjavirus[Organism] OR Thogotovirus[Organism]) AND ("complete genome"[Title] OR "complete cds"[Title]) AND 1000:3000[SLEN]

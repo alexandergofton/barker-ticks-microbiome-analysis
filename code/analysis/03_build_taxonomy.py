@@ -2,7 +2,7 @@
 """Step 3 -- build the taxon lineage / annotation table (rowData for the TSE).
 
 Collects every distinct lca_taxid across lca/*.blast.lca, resolves a full
-lineage for each via taxopy, and classifies it into the analysis scope.
+lineage for each from the taxdump, and classifies it into the analysis scope.
 
 CLASSIFICATION RULES (verified against the local taxdump, not assumed)
   * Viruses have an 'acellular root' key and no 'domain' key.
@@ -25,12 +25,79 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import taxopy
+from array import array
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, load_config, load_contaminants, write_tsv  # noqa: E402
+from common import ROOT, load_config, load_contaminants, load_contig_reassignments, write_tsv  # noqa: E402
 
 RANKS = ["domain", "kingdom", "phylum", "class", "order", "family", "genus", "species"]
+
+
+class LeanTaxDb:
+    """Lineages from the NCBI taxdump without holding it as Python objects.
+
+    taxopy.TaxDb keeps all ~2.7M nodes and names as dicts and is OOM-killed on
+    this node (~1.8 GB free). Parents and ranks go in flat arrays indexed by
+    taxid; scientific names are kept only for the lineages actually needed.
+    lineage() returns what taxopy.Taxon gave: (name, rank, {rank: name}).
+    """
+
+    def __init__(self, nodes: Path, names: Path, merged: Path, taxids):
+        with open(nodes) as fh:
+            max_id = max(int(line.split("\t|\t", 1)[0]) for line in fh)
+        self.parent = array("i", bytes(4 * (max_id + 1)))
+        self.rank = array("H", bytes(2 * (max_id + 1)))
+        self.rank_names: list[str] = [""]
+        codes: dict[str, int] = {}
+        with open(nodes) as fh:
+            for line in fh:
+                p = line.split("\t|\t", 3)
+                t = int(p[0])
+                if p[2] not in codes:
+                    codes[p[2]] = len(self.rank_names)
+                    self.rank_names.append(p[2])
+                self.parent[t], self.rank[t] = int(p[1]), codes[p[2]]
+        self.merged: dict[int, int] = {}
+        with open(merged) as fh:
+            for line in fh:
+                p = line.split("\t|\t")
+                self.merged[int(p[0])] = int(p[1].split("\t")[0])
+        want = set()
+        for t in taxids:
+            want.update(self.path(t))
+        self.names: dict[int, str] = {}
+        with open(names) as fh:
+            for line in fh:
+                if "scientific name" in line:
+                    p = line.split("\t|\t", 2)
+                    if int(p[0]) in want:
+                        self.names[int(p[0])] = p[1]
+
+    def resolve(self, taxid: int) -> int:
+        t = self.merged.get(taxid, taxid)
+        if not (0 < t < len(self.parent)) or not self.parent[t]:
+            raise KeyError(taxid)
+        return t
+
+    def path(self, taxid: int) -> list[int]:
+        try:
+            t = self.resolve(taxid)
+        except KeyError:
+            return []
+        out = [t]
+        while t != 1 and self.parent[t] != t:
+            t = self.parent[t]
+            out.append(t)
+        return out
+
+    def lineage(self, taxid: int) -> tuple[str, str, dict[str, str]]:
+        p = self.path(taxid)
+        if not p:
+            raise KeyError(taxid)
+        d: dict[str, str] = {}
+        for t in reversed(p):          # root first, so the nearest node wins
+            d[self.rank_names[self.rank[t]]] = self.names.get(t, "")
+        return self.names.get(p[0], ""), self.rank_names[self.rank[p[0]]], d
 
 
 def collect_taxids(lca_dir: Path) -> dict[int, tuple[str, str]]:
@@ -62,15 +129,17 @@ def main() -> None:
     excl_kingdoms = set(scope["exclude_euk_kingdoms"])
     contaminants = load_contaminants()
 
-    print("Loading taxonomy database...", file=sys.stderr)
-    db = taxopy.TaxDb(
-        nodes_dmp=str(ROOT / "taxdump" / "nodes.dmp"),
-        names_dmp=str(ROOT / "taxdump" / "names.dmp"),
-        merged_dmp=str(ROOT / "taxdump" / "merged.filtered.dmp"),
-    )
-
     print("Collecting taxids from LCA files...", file=sys.stderr)
     seen = collect_taxids(ROOT / "lca")
+    # Taxa that curated contig re-assignments (step 04) map contigs onto; name
+    # and rank are filled from the taxdump below.
+    for fixes in load_contig_reassignments().values():
+        for t in set(fixes.values()):
+            seen.setdefault(t, ("", ""))
+
+    print("Loading taxonomy database...", file=sys.stderr)
+    db = LeanTaxDb(ROOT / "taxdump" / "nodes.dmp", ROOT / "taxdump" / "names.dmp",
+                   ROOT / "taxdump" / "merged.filtered.dmp", seen)
 
     rows = []
     n_unresolved = 0
@@ -82,11 +151,10 @@ def main() -> None:
             is_virus = False
         else:
             try:
-                tx = taxopy.Taxon(taxid, db)
-                d = tx.rank_name_dictionary
-                # taxopy reports the name as-recorded; prefer it over the LCA file
-                row["lca_name"] = tx.name
-                row["lca_rank"] = tx.rank
+                name, rank, d = db.lineage(taxid)
+                # the taxdump name as-recorded; preferred over the LCA file
+                row["lca_name"] = name
+                row["lca_rank"] = rank
             except Exception:
                 d = {}
                 n_unresolved += 1

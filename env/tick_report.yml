@@ -1,0 +1,37 @@
+# Conda environment for the sampling maps (step 10c) and the Quarto report
+# (report/tick_microbiome_report.qmd).
+#
+# Kept SEPARATE from tick_micro on purpose. Adding sf/leaflet to tick_micro
+# made the solver upgrade the whole env (R 4.3 -> 4.4, mia 1.10 -> 1.14,
+# ggplot2 3.5 -> 4.0), and that transaction then failed on a Bioconductor
+# data package whose post-link step downloads from bioconductor.org. Nothing
+# here needs Bioconductor: step 10c and the report read only the TSV/PNG
+# outputs, so this env stays small and leaves the analysis env untouched.
+#
+#   mamba env create -f env/tick_report.yml
+name: tick_report
+channels:
+  - conda-forge
+dependencies:
+  - r-base=4.3
+  - r-data.table
+  - r-yaml
+  - r-ggplot2
+  - r-ggrepel
+  - r-patchwork
+  - r-scales
+  # --- maps ---------------------------------------------------------------
+  - r-sf
+  - r-rnaturalearth
+  - r-rnaturalearthdata
+  - r-ggspatial
+  - r-leaflet
+  - r-htmlwidgets
+  # --- trees (report re-draws the mitogenome tree) -------------------------
+  - r-ape
+  - r-phangorn
+  # --- report -------------------------------------------------------------
+  - quarto
+  - r-knitr
+  - r-rmarkdown
+  - r-dt

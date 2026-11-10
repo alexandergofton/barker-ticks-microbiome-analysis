@@ -18,18 +18,26 @@
 #   n_contigs       EVIDENCE ONLY. How many contigs support the taxon.
 #
 # rowData = results/taxonomy/taxon_lineage.tsv  (lineage + scope + contaminant flag)
+#
+# Unidentifiable taxa and contaminant genera listed under taxon_removal in
+# config/analysis_params.yaml are REMOVED here and TPM renormalised.
 # colData = metadata/sample_metadata.tsv + per-sample QC from fraction_summary.tsv
 
+# tidyverse is attached LAST so dplyr's verbs (filter, rename, desc, ...) are
+# not masked by the Bioconductor packages.
 suppressPackageStartupMessages({
-  library(data.table)
   library(yaml)
   library(TreeSummarizedExperiment)
   library(mia)
   library(S4Vectors)
+  library(tidyverse)
 })
 
-.here <- dirname(sub("^--file=", "",
-                     commandArgs(FALSE)[grep("^--file=", commandArgs(FALSE))][1]))
+.here <- commandArgs(FALSE) |>
+  str_subset("^--file=") |>
+  first() |>
+  str_remove("^--file=") |>
+  dirname()
 source(file.path(.here, "common.R"))
 params <- load_params()
 
@@ -54,18 +62,19 @@ stopifnot(identical(dim(tpm), dim(reads)), identical(dim(tpm), dim(ncont)))
 # Matrix rows are rank LABELS, not taxids -- several taxids collapse into one
 # label at genus/family level, and unresolved bins have no taxid at all. So
 # rowData is built by collapsing the lineage table to unique labels.
-tax <- fread(file.path(ROOT, "results", "taxonomy", "taxon_lineage.tsv"),
-             na.strings = "")
+tax <- data.table::fread(file.path(ROOT, "results", "taxonomy", "taxon_lineage.tsv"),
+                         na.strings = "") |>
+  as_tibble()
 rank_cols <- c("domain", "kingdom", "phylum", "class", "order", "family",
                "genus", "species")
 idx <- match(RANK, rank_cols)
 
-label_of <- function(dt) {
-  lab <- as.character(dt[[RANK]])
+label_of <- function(df) {
+  lab <- as.character(df[[RANK]])
   miss <- is.na(lab) | lab == ""
   for (up in rank_cols[seq_len(idx - 1)][rev(seq_len(idx - 1))]) {
     if (!any(miss)) break
-    anc <- as.character(dt[[up]])
+    anc <- as.character(df[[up]])
     fill <- miss & !is.na(anc) & anc != ""
     lab[fill] <- paste0(anc[fill], " (unresolved)")
     miss <- miss & !fill
@@ -73,7 +82,7 @@ label_of <- function(dt) {
   lab[miss] <- "unresolved"
   lab
 }
-tax[, label := label_of(.SD)]
+tax <- tax |> mutate(label = label_of(pick(everything())))
 
 # Restrict to microbial taxa BEFORE deduplicating by label.
 #
@@ -83,16 +92,19 @@ tax[, label := label_of(.SD)]
 # only ever contains microbial taxa, so deduplicating over the full lineage
 # table could attach an Arthropoda lineage to a bacterial row. Filtering first
 # makes that impossible.
-tax <- tax[scope_class == "microbial"]
+tax <- tax |> filter(scope_class == "microbial")
 
-# one row per label; keep the lineage down to RANK plus the annotations
+# one row per label; keep the lineage down to RANK plus the annotations.
+# Joining onto the matrix labels puts rowData in matrix row order, and a label
+# with no lineage match keeps its name with NA lineage.
 keep_ranks <- rank_cols[seq_len(idx)]
-rd <- unique(tax[label %in% rownames(tpm),
-                 c("label", keep_ranks, "superkingdom_group", "scope_class",
-                   "contaminant_flag", "contaminant_confidence"), with = FALSE],
-             by = "label")
-rd <- rd[match(rownames(tpm), rd$label)]
-rd[is.na(label), label := rownames(tpm)[is.na(rd$label)]]
+rd <- tax |>
+  filter(label %in% rownames(tpm)) |>
+  select(label, all_of(keep_ranks), superkingdom_group, scope_class,
+         contaminant_flag, contaminant_confidence) |>
+  distinct(label, .keep_all = TRUE)
+rd <- tibble(label = rownames(tpm)) |>
+  left_join(rd, by = "label")
 rd <- as.data.frame(rd); rownames(rd) <- rownames(tpm)
 say("  rowData: %d rows, %d contaminant-flagged",
     nrow(rd), sum(rd$contaminant_flag %in% 1, na.rm = TRUE))
@@ -105,19 +117,54 @@ if (any(is.na(rd$scope_class))) {
   say("         rather than a taxon and so has no lineage)")
 }
 
+# ---- taxon removal ---------------------------------------------------------
+# See config taxon_removal. Unidentifiable bins and named contaminant genera are
+# removed here, once, so every downstream step sees the same taxon set. TPM is
+# renormalised to 1e6 over the remaining taxa.
+rm_cfg <- params$taxon_removal
+is_blank <- function(v) is.na(v) | v == ""
+placeholder <- grepl(rm_cfg$placeholder_pattern, rd$species, ignore.case = TRUE)
+drop_unres <- isTRUE(rm_cfg$drop_unresolved) & is_blank(rd$genus) &
+  (is_blank(rd$species) | placeholder)
+drop_excl <- rd$genus %in% unlist(rm_cfg$exclude_genera)
+drop <- drop_unres | drop_excl
+removed <- data.frame(
+  label = rownames(rd)[drop],
+  reason = ifelse(drop_excl[drop], "excluded_genus", "unresolved"),
+  total_tpm = rowSums(tpm[drop, , drop = FALSE]),
+  n_samples = rowSums(tpm[drop, , drop = FALSE] > 0)
+)
+lost <- colSums(tpm[drop, , drop = FALSE]) / pmax(colSums(tpm), 1)
+say("  removed %d unresolved + %d excluded-genus taxa (%s)",
+    sum(drop_unres & !drop_excl), sum(drop_excl),
+    paste(unlist(rm_cfg$exclude_genera), collapse = ", "))
+say("    median %.1f%% (max %.1f%%) of per-sample microbial TPM removed",
+    100 * median(lost), 100 * max(lost))
+tpm <- tpm[!drop, , drop = FALSE]
+reads <- reads[!drop, , drop = FALSE]
+ncont <- ncont[!drop, , drop = FALSE]
+rd <- rd[!drop, , drop = FALSE]
+cs0 <- colSums(tpm)
+tpm <- sweep(tpm, 2, ifelse(cs0 > 0, cs0 / 1e6, 1), "/")
+
 # ---- colData ---------------------------------------------------------------
 meta_path <- file.path(ROOT, "metadata", "sample_metadata.tsv")
 if (file.exists(meta_path)) {
-  meta <- fread(meta_path, na.strings = c("", "NA"))
+  meta <- data.table::fread(meta_path, na.strings = c("", "NA")) |> as_tibble()
 } else {
   say("  NOTE: metadata/sample_metadata.tsv absent -- falling back to the")
   say("        TEMPLATE. colData will carry the id-string guesses only.")
-  meta <- fread(file.path(ROOT, "metadata", "sample_metadata_TEMPLATE.tsv"),
-                na.strings = c("", "NA"))
+  meta <- data.table::fread(file.path(ROOT, "metadata", "sample_metadata_TEMPLATE.tsv"),
+                            na.strings = c("", "NA")) |>
+    as_tibble()
 }
-qc <- fread(file.path(ROOT, "results", "tables", "fraction_summary.tsv"))
-cd <- merge(meta, qc, by = "sample_id", all.y = TRUE, sort = FALSE)
-cd <- cd[match(colnames(tpm), cd$sample_id)]
+qc <- data.table::fread(file.path(ROOT, "results", "tables", "fraction_summary.tsv")) |>
+  as_tibble()
+# every QC sample, then only the matrix samples, in matrix column order
+cd <- right_join(meta, qc, by = "sample_id") |>
+  relocate(sample_id) |>
+  filter(sample_id %in% colnames(tpm)) |>
+  arrange(match(sample_id, colnames(tpm)))
 stopifnot(identical(as.character(cd$sample_id), colnames(tpm)))
 cd <- as.data.frame(cd); rownames(cd) <- cd$sample_id
 say("  colData: %d samples x %d fields", nrow(cd), ncol(cd))
@@ -149,7 +196,18 @@ say("  wrote results/tse/tick_microbiome_tse.rds")
 for (r in intersect(params$scope$ranks_to_export, keep_ranks)) {
   if (r == RANK) next
   ok <- tryCatch({
-    ag <- agglomerateByRank(tse, rank = r, na.rm = FALSE)
+    # At genus rank, a named species with no NCBI genus (common for tick
+    # viruses) stands in as its own genus instead of being binned into
+    # "<family> (unresolved)" -- or, with no family either, "unresolved".
+    src <- tse
+    if (r == "genus") {
+      g <- rowData(src)$genus
+      nog <- is_blank(g) & !is_blank(rowData(src)$species)
+      g[nog] <- rowData(src)$species[nog]
+      rowData(src)$genus <- g
+      say("  genus rank: %d genus-less named species kept under their own name", sum(nog))
+    }
+    ag <- agglomerateByRank(src, rank = r, na.rm = FALSE)
 
     # mia names agglomerated rows by their FULL lineage path
     # ("Bacteria_Pseudomonadati_..._Acanthamoeba"), which correctly keeps
@@ -198,7 +256,8 @@ for (r in intersect(params$scope$ranks_to_export, keep_ranks)) {
 flat <- file.path(outdir, "flat"); dir.create(flat, showWarnings = FALSE)
 write.table(rd, file.path(flat, "rowData.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 write.table(cd, file.path(flat, "colData.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
-say("  wrote results/tse/flat/{rowData,colData}.tsv")
+write.table(removed, file.path(flat, "removed_taxa.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
+say("  wrote results/tse/flat/{rowData,colData,removed_taxa}.tsv")
 
 # ---- verification ----------------------------------------------------------
 cs <- colSums(assay(tse, "tpm_microbial"))

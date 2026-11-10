@@ -29,83 +29,13 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import ROOT, write_tsv  # noqa: E402
-from markers_lib import cfg_markers, load_panel, out_root, read_fasta, write_fasta  # noqa: E402
-
-EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
-
-
-class Entrez:
-    """Minimal Entrez client. stdlib only -- biopython is not a dependency."""
-
-    def __init__(self, email: str, api_key: str | None, tool: str = "barker_ticks_markers"):
-        self.email, self.api_key, self.tool = email, api_key, tool
-        # NCBI's published ceiling: 3 requests/s anonymous, 10/s with a key.
-        self.min_interval = 0.11 if api_key else 0.34
-        self._last = 0.0
-
-    def _throttle(self) -> None:
-        wait = self.min_interval - (time.time() - self._last)
-        if wait > 0:
-            time.sleep(wait)
-        self._last = time.time()
-
-    def _call(self, endpoint: str, params: dict, retries: int = 4) -> str:
-        p = dict(params, email=self.email, tool=self.tool)
-        if self.api_key:
-            p["api_key"] = self.api_key
-        data = urllib.parse.urlencode(p).encode()
-        last_err = None
-        for attempt in range(retries):
-            self._throttle()
-            try:
-                req = urllib.request.Request(f"{EUTILS}/{endpoint}", data=data)
-                with urllib.request.urlopen(req, timeout=120) as fh:
-                    return fh.read().decode("utf-8", "replace")
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
-                last_err = e
-                # 429/500 under load are routine; back off rather than abort a
-                # 118-locus run because one request was rate limited.
-                time.sleep(2 ** attempt)
-        raise RuntimeError(f"{endpoint} failed after {retries} tries: {last_err}")
-
-    def esearch(self, db: str, term: str, retmax: int) -> list[str]:
-        xml = self._call("esearch.fcgi", {"db": db, "term": term,
-                                          "retmax": str(retmax), "sort": "relevance"})
-        # Parse the IdList block by regex, not line by line: NCBI packs
-        # <eSearchResult>..<IdList> onto one line, and the <TranslationStack>
-        # further down contains <Count> elements that must not be mistaken for
-        # results.
-        block = re.search(r"<IdList>(.*?)</IdList>", xml, re.S)
-        return re.findall(r"<Id>(\d+)</Id>", block.group(1)) if block else []
-
-    def efetch_fasta(self, db: str, ids: list[str]) -> str:
-        if not ids:
-            return ""
-        return self._call("efetch.fcgi", {"db": db, "id": ",".join(ids),
-                                          "rettype": "fasta", "retmode": "text"})
-
-
-def dedupe(seqs: dict[str, str], max_len: int) -> dict[str, str]:
-    """Drop over-long records and exact sequence duplicates, keep first name."""
-    seen: set[str] = set()
-    out: dict[str, str] = {}
-    for name, seq in seqs.items():
-        s = seq.upper().replace("-", "")
-        if not s or len(s) > max_len or s in seen:
-            continue
-        seen.add(s)
-        out[name] = seq
-    return out
+from markers_lib import (Entrez, cfg_markers, dedupe_refs, load_panel, out_root,  # noqa: E402
+                         read_fasta, write_fasta)
 
 
 def main() -> None:
@@ -155,7 +85,7 @@ def main() -> None:
             fasta = ez.efetch_fasta(row["entrez_db"], ids[: row["n_refs"] * 3])
             tmp = refs_dir / f".{row['key']}.tmp"
             tmp.write_text(fasta)
-            got = dedupe(read_fasta(tmp), rc["max_seq_len"])
+            got = dedupe_refs(read_fasta(tmp), rc["max_seq_len"])
             tmp.unlink(missing_ok=True)
             got = dict(list(got.items())[: row["n_refs"]])
             if got:

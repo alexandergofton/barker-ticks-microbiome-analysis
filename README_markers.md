@@ -228,6 +228,14 @@ them, but the trees are yours to build — the choice of model, of outgroup and
 of which fragmentary sequences deserve to be in the analysis is not something
 this pipeline should be making.
 
+> **Or run `bash run_trees.sh` and let it make those choices explicitly.**
+> Steps 17–19 fetch a named-species reference set per locus from two curated
+> panels, verify every reference by blasting the locus out of it, align it with
+> the samples and build a FastTree — alignment, Newick and figure per locus.
+> The choices are written down rather than hidden, and the result is a
+> screening tree you re-do properly for the loci that matter.
+> See `README_trees.md`.
+
 ### A short sequence is not a species identification
 
 Many of these loci come off contigs of a few hundred bp. A 300 bp `gltA`

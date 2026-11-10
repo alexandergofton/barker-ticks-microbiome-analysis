@@ -1,0 +1,20 @@
+# Corrections applied to metadata host_species before it is resolved to an
+# NCBI taxid (step 32, blood-meal workflow). Only the host value is corrected
+# here; the curated metadata itself is untouched.
+#   host_species   exactly as in metadata/sample_metadata.tsv
+#   resolved_name  the name looked up in taxdump/names.dmp ("" = no host)
+#   note           why
+host_species	resolved_name	note
+Questing		questing tick: no current host; any blood meal is from the previous life stage
+Australian raven (Corvus coronides)	Corvus coronoides	spelling
+Brown antechinus (Antechinus stuarti)	Antechinus stuartii	spelling
+Golden bandicoot (Isodon auratus)	Isoodon auratus	spelling
+Isoodon macronus	Isoodon macrourus	spelling (northern brown bandicoot)
+Koala (Phascolarctos cincereus)	Phascolarctos cinereus	spelling
+Mountain pygmy possum (Burramys parva)	Burramys parvus	spelling
+Water python (Liasus fuscus)	Liasis fuscus	spelling
+Eastern cattle egret (Ardea coromanda)	Bubulcus ibis	NCBI has no separate eastern cattle egret; B. ibis (syn. Ardea ibis) at species level
+Shark Bay Shingleback lizard (Tiliqua rugosa palarra)	Tiliqua rugosa	subspecies not in NCBI; compared at species level
+Anthochaera sp.	Anthochaera	genus only
+Wallabia sp.	Wallabia	genus only (monotypic: W. bicolor)
+Brown boobie (Onychoprion fuscatus)	Onychoprion fuscatus	CHECK: common name is brown booby (Sula leucogaster, Sulidae); scientific name is sooty tern (Laridae). Scientific name used. Blood-meal step 34: sample 8336 is Sula dactylatra (masked booby) at 100% over 8 contigs, i.e. a booby, not a tern -- the scientific name is probably the error

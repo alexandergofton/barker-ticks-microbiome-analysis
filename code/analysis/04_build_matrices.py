@@ -39,13 +39,18 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import ROOT, load_aliases, load_config, resolve_artefact, write_tsv  # noqa: E402
+from common import (ROOT, load_aliases, load_config, load_contig_reassignments,  # noqa: E402
+                    resolve_artefact, write_tsv)
 
 EXPORT_RANKS = ["species", "genus", "family", "phylum"]
 BOWTIE_RE = re.compile(r"([\d.]+)% overall alignment rate")
 
 
 ALIASES = load_aliases()
+# Curated contig-level corrections to the LCA (metadata/contig_reassignments.tsv):
+# applied before filtering, so a re-assigned contig is scoped exactly like any
+# other contig of its new taxon.
+REASSIGN = load_contig_reassignments()
 
 
 def read_alignment_rate(sample: str) -> float | None:
@@ -113,6 +118,9 @@ def process_sample(sample: str, tax: pd.DataFrame, cfg_filter: dict) -> tuple | 
         return None
 
     lca = pd.read_csv(lca_p, sep="\t", usecols=["query", "lca_taxid", "n_hits", "top_bitscore"])
+    if sample in REASSIGN:
+        fix = lca["query"].map(REASSIGN[sample])
+        lca["lca_taxid"] = fix.fillna(lca["lca_taxid"]).astype(int)
     cov = pd.read_csv(cov_p, sep="\t",
                       usecols=["contig_id", "contig_len", "mapped_reads", "tpm"])
 

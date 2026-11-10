@@ -11,6 +11,11 @@ cd "$(dirname "$0")" || exit 1
 
 PY="${PYTHON:-python3}"
 RS="${RSCRIPT:-/data/hb-austick/work/miniforge3/envs/tick_micro/bin/Rscript}"
+# Maps + report env (sf, leaflet, quarto); see env/tick_report.yml. Run through
+# `conda run` because sf (PROJ/GDAL data) and quarto (QUARTO_SHARE_PATH) rely on
+# variables set by the env's activation scripts.
+CONDA="${CONDA_EXE:-/data/hb-austick/work/miniforge3/bin/conda}"
+RS_REPORT="${RSCRIPT_REPORT:-$CONDA run -n tick_report --cwd $PWD Rscript}"
 
 step() { echo; echo "=============== $* ==============="; }
 die()  { echo "FAILED: $*" >&2; exit 1; }
@@ -30,6 +35,11 @@ $PY code/analysis/04b_filter_sensitivity.py 30   || echo "WARN: sensitivity fail
 step "5  metadata template"
 $PY code/analysis/05_make_metadata_template.py   || die "metadata template"
 
+if [ -f metadata/barker_microbe_analysis_metadata.csv ]; then
+    step "5b import curated metadata"
+    $PY code/analysis/05b_import_metadata.py     || die "metadata import"
+fi
+
 step "verification"
 $PY code/analysis/verify.py                      || die "verification"
 
@@ -39,8 +49,8 @@ if [ -f metadata/sample_metadata.tsv ]; then
 else
     echo
     echo "SKIP step 6: metadata/sample_metadata.tsv not found."
-    echo "  Fill in metadata/sample_metadata_TEMPLATE.tsv and save it under that"
-    echo "  name. Until then the TSE falls back to the id-string guesses and no"
+    echo "  It is built by step 5b from metadata/barker_microbe_analysis_metadata.csv."
+    echo "  Until then the TSE falls back to the id-string guesses and no"
     echo "  biological hypothesis can be tested properly."
 fi
 
@@ -55,6 +65,20 @@ $RS code/analysis/09_diversity.R                 || die "diversity"
 
 step "10 pathogen / endosymbiont targets"
 $PY code/analysis/10_export_targets.py           || die "targets"
+
+if [ -f metadata/sample_metadata.tsv ]; then
+    step "10b tick genus / species comparison"
+    $RS code/analysis/10b_tick_group_comparison.R || die "tick group comparison"
+
+    step "10c sampling maps"
+    $RS_REPORT code/analysis/10c_sampling_maps.R || die "maps"
+fi
+
+if [ "${RENDER_REPORT:-1}" = "1" ]; then
+    step "report  (quarto render; RENDER_REPORT=0 to skip)"
+    $CONDA run -n tick_report --cwd "$PWD/report" quarto render tick_microbiome_report.qmd \
+        || echo "WARN: report render failed (non-fatal)"
+fi
 
 echo
 echo "=============== done ==============="

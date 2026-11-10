@@ -5,7 +5,8 @@ project:
   name: barker_ticks_microbiome
   root: /data/hb-austick/work/AlexG_data/Barker_ticks/microbe_analysis/old_analysis
   # Framing: no extraction blanks or no-template controls exist in this experiment.
-  # Composition is reported descriptively. Contaminant taxa are ANNOTATED, never removed.
+  # Composition is reported descriptively. Reagent-contaminant taxa are ANNOTATED, not
+  # removed; only taxa listed under taxon_removal (below) are removed, at step 07.
   design: descriptive_observational_no_controls
 
 paths:
@@ -68,6 +69,28 @@ scope:
   ranks_to_export:   [species, genus, family, phylum]
   primary_rank:      species
 
+# ---------------------------------------------------------------------------
+# Taxa REMOVED from the TSE (step 07) before any composition / diversity /
+# group analysis. tpm_microbial is renormalised to 1e6 over what remains, so
+# downstream composition describes the identifiable microbial fraction only.
+# Removed rows are listed in results/tse/flat/removed_taxa.tsv.
+# ---------------------------------------------------------------------------
+taxon_removal:
+  # Drop taxa with no genus AND no usable species name: "unresolved",
+  # "Eukaryota (unresolved)", "Bacteria (unresolved)", ..., plus genus-less
+  # NCBI placeholder names matching placeholder_pattern ("uncultured bacterium",
+  # "Caudoviricetes sp.", "Bacteroidales bacterium SW299", ...).
+  # KEPT: genus-only calls ("Rickettsia (unresolved)") and named species
+  # without an NCBI genus (North shore virus, jingmenviruses, Coxiella-like
+  # endosymbiont, named phages). In the genus-level TSE these appear under their
+  # species name rather than being binned as "<family> (unresolved)".
+  drop_unresolved: true
+  placeholder_pattern: "^(uncultured|unidentified|unclassified)|environmental|metagenome| sp\\.( |$)|(^| )(bacterium|proteobacterium|archaeon|haloarchaeon)( |$)"
+  # Genera removed outright as contaminants (matched on the genus column).
+  # Iltovirus: avian alphaherpesvirus in most samples irrespective of tick
+  # genus or locality -- laboratory/reagent contamination.
+  exclude_genera: [Iltovirus]
+
 lca_run:
   evalue:      1.0e-5
   pident:      0.0
@@ -75,8 +98,38 @@ lca_run:
 
 diversity:
   clr_pseudocount: 1.0
-  permanova_terms: [tick_species, life_stage, state, flowcell, lane]
+  permanova_terms: [tick_genus, tick_species, host_type, life_stage, flowcell, lane]
   permanova_permutations: 999
+
+# ---------------------------------------------------------------------------
+# Tick genus / species comparisons and sampling maps (code/analysis/10b, 10c).
+# Metadata comes from metadata/barker_microbe_analysis_metadata.csv via step 5b.
+# ---------------------------------------------------------------------------
+tick_groups:
+  # Groups smaller than this are drawn in figures but never tested.
+  min_samples_per_group: 3
+  # Target categories (metadata/target_taxa.tsv) treated as endosymbionts.
+  # "both" = Rickettsia / Francisella / Coxiella: genus-level calls only.
+  symbiont_categories: [endosymbiont, both]
+  top_taxa: 20                    # rows in the composition heatmaps (fig 11a/b)
+  top_taxa_extended: 50           # rows in the extended heatmaps (fig 11c/d)
+  top_dominant: 10                # columns in the dominant-genus figure
+  min_detections_for_abundance: 5 # endosymbiont needs this many calls for figs 14 / co-occurrence
+  indicator_min_prevalence: 0.05  # genus must pass the read threshold in >= 5% of samples
+  mantel_min_samples: 6
+  fisher_B: 20000                 # Monte-Carlo replicates for r x c Fisher tests
+  seed: 1
+
+maps:
+  # Static map extent (lon, lat). Samples outside it are listed in the caption.
+  xlim: [112, 155]
+  ylim: [-44.5, -8.5]
+  # Samples sharing coordinates are fanned out by this many degrees in the
+  # interactive map only, so every one can be clicked. Popups show true coords.
+  spread_deg: 0.03
+  # Inset on figure 16a: the densely sampled south-east Queensland cluster.
+  zoom_xlim: [150.6, 153.7]
+  zoom_ylim: [-29.2, -25.9]
 
 # ---------------------------------------------------------------------------
 # Phylogenetic marker gene extraction (code/analysis/11..16, run_markers.sh).
@@ -134,3 +187,299 @@ markers:
     # Protein-coding loci are aligned as amino acids and back-translated to a
     # codon-preserving nucleotide alignment; both are written out.
     codon_aware:       true
+
+# ---------------------------------------------------------------------------
+# Tick mitochondrial genome extraction, annotation and phylogenomics
+# (code/analysis/20-26, run_mito.sh).
+#
+# One mitogenome candidate is picked PER SAMPLE by homology (tblastn of the 13
+# protein-coding genes + blastn of the two rRNAs against that sample's
+# length-filtered contigs), using the invertebrate mitochondrial genetic code
+# (NCBI transl_table 5) throughout -- the standard code misreads TGA (Trp in
+# this code) as a stop in every mitochondrial gene.
+#
+# MITOS2 (https://gitlab.com/Bernt/MITOS) is the intended annotator, and its
+# conda package installs cleanly, but its reference database is distributed
+# ONLY from Zenodo (zenodo.org/record/4284483), which this compute node could
+# not reach -- every attempt timed out (see README_mito.md for the exact
+# probe). Step 22 therefore annotates by homology (tblastn/blastn against the
+# panel in metadata/mito_genes.tsv) by default, which is what is actually used
+# below. If you later fetch the Zenodo refdata on a machine that can reach it
+# and point `mitos.refdata_dir` at it, step 22 uses real MITOS2 automatically
+# and the homology calls become an unused fallback.
+# ---------------------------------------------------------------------------
+mito:
+  out_dir: results/mito
+  genetic_code: 5   # NCBI invertebrate mitochondrial
+
+  refs:
+    email:       alexander.gofton@gmail.com
+    api_key_env: NCBI_API_KEY
+    max_seq_len: 25000
+    min_refs_ok: 1
+
+  candidates:
+    min_contig_len: 3000     # bp; below this a fragment cannot carry >1-2 genes
+    max_contig_len: 22000     # bp; above typical Ixodida mitogenome + control-region margin
+    threads: 8
+    evalue_pcg:  1.0e-10
+    evalue_rrna: 1.0e-20
+    merge_gap_pcg:  300       # bp between HSPs of the SAME gene merged into one locus
+    merge_gap_rrna: 200
+    # No cross-gene paralog-overlap resolution here (contrast the marker
+    # workflow's `search.paralog_overlap` above): mitochondrial PCGs are
+    # single-copy and share no homology with each other or the rRNAs, so an
+    # overlap between two different genes' HSP-approximate boundaries is
+    # normal adjacent-gene imprecision, not a competing paralog call -- see
+    # 21_find_mito_candidates.py. Only cap_one_locus_per_gene applies, which
+    # protects against the one real error: the SAME gene claiming two disjoint
+    # regions on one contig.
+    #
+    # winning contig per sample = most distinct genes recovered, then highest
+    # contig coverage, then summed bitscore, then longest -- see 21_find_mito_candidates.py
+    #
+    # Only contigs whose own nt-BLAST LCA (lca/<sample>.blast.lca, step 03
+    # lineage) falls inside `tick_order` are eligible. A blood-meal vertebrate
+    # mitogenome carries the same 13 genes and otherwise wins on gene count
+    # (7 samples on this cohort). Contigs with no nt hit at all stay eligible
+    # but rank below confirmed tick contigs (complete Ornithodoros mitogenomes
+    # here have no nt hit). enabled: false restores the old selection.
+    lca_filter:
+      enabled: true
+      tick_order: Ixodida
+
+  annotate:
+    min_locus_len_nt: 60
+    # Real MITOS2, if its reference data is available locally. Point this at the
+    # refseqver directory itself (e.g. .../refseq89_metazoa) -- its basename is
+    # used as -r/--refseqver and its parent as -R/--refdir, so the two always
+    # name the same place. Leave unset (or pointing at a path that doesn't
+    # exist) to always use the homology fallback -- see the note above.
+    mitos_refdata_dir: ""
+
+  # Published reference mitogenomes (step 20b; panel = metadata/mito_ref_genomes.tsv).
+  # Annotated exactly like the samples and aligned/treed with them, so every
+  # sample tip sits among named species and the tree can be properly rooted.
+  # Set include_in_tree: false to rebuild the samples-only tree.
+  ref_genomes:
+    include_in_tree: true
+
+  align:
+    tool: mafft
+    mafft_opts: --auto --maxiterate 1000
+    min_seqs_to_align: 3
+
+  tree:
+    # A sample recovering only 1-2 of the 13 genes is almost pure missing data
+    # in the concatenated matrix and is exactly the profile that produces a
+    # rogue/long-branch taxon in ML tree search. Excluded from the tree by
+    # default (still fully reported in mito_selection.tsv); set to 0 to include
+    # every sample regardless.
+    min_genes_for_tree: 3
+    # Root the figure on the branch separating this family's REFERENCE tips
+    # from the rest (the Argasidae/Ixodidae split, the deepest well-established
+    # node among living ticks). Reference tips only, so a mislabelled sample
+    # cannot break the rooting. Falls back to midpoint rooting if those tips are
+    # not monophyletic in the ML tree, or if no references are included.
+    outgroup_family: Argasidae
+
+  # Step 26c: why is a mitogenome genus-discordant? Compares the genus of the
+  # sample's high-identity tick hits in its raw nt BLAST, split into nuclear
+  # rRNA vs mitochondrial subjects (raw "% of tick hits per genus" is useless:
+  # nt's nuclear tick genomes are mostly Dermacentor/Rhipicephalus).
+  audit:
+    min_pident: 95       # % identity for a hit to name the genus present
+    min_aln_len: 150
+    rrna_major: 0.8      # curated-genus share of nuclear rRNA >= this: tick ID stands
+    rrna_minor: 0.05     # curated share < this in BOTH nuclear rRNA and mito hits: absent (WRONG_TICK).
+                         # Every clear swap on this cohort is 0.0%; 8225-3L1 (pooled larvae) sits at 7% / 20%
+
+  iqtree:
+    model_select: MFP        # ModelFinder per partition; add +MERGE to test lumping
+    bootstrap: 1000           # ultrafast bootstrap (-B)
+    alrt: 1000                # SH-aLRT (--alrt)
+    threads: AUTO
+    seed: 1
+
+# ---------------------------------------------------------------------------
+# Marker-gene PHYLOGENIES (code/analysis/17-19, run_trees.sh).
+#
+# Second half of the marker workflow. Steps 11-16 recover a locus from the
+# assemblies and stop at an alignment of sample sequences only; steps 17-19
+# fetch the named-species references that give those tips an identity, cut the
+# locus out of them, align everything together and build a tree.
+#
+# The reference panels are metadata/tree_references.tsv (per target x marker)
+# and metadata/tree_ref_genomes.tsv (per target). Edit those, not this block,
+# to change WHICH references are used; this block holds how they are filtered,
+# aligned and turned into trees.
+#
+# FastTree, not IQ-TREE, on purpose: 47 loci x up to ~160 tips, approximately
+# ML, seconds per tree, SH-like local support at every node. The mitogenome
+# workflow (step 25) is where the slow partitioned ML analysis lives. These are
+# per-locus screening trees -- re-run the ones that matter in IQ-TREE.
+# ---------------------------------------------------------------------------
+trees:
+  out_dir:       results/markers/trees
+  refs_panel:    metadata/tree_references.tsv
+  genomes_panel: metadata/tree_ref_genomes.tsv
+
+  fetch:
+    email:        alexander.gofton@gmail.com
+    api_key_env:  NCBI_API_KEY
+    # Records are screened on esummary (accession, title, length) BEFORE being
+    # downloaded, so a query that matches 400 near-identical R. felis entries
+    # costs one summary call, not 400 sequence downloads.
+    search_multiplier:   8      # esearch retmax = n_refs * this, then capped
+    max_gene_seq_len:    60000  # a "gene" record longer than this is a genome
+    max_genome_seq_len:  12000000
+    batch_size:          25     # accessions per efetch call (gene records)
+    genome_batch_size:   3      # genomes are megabases; fetch few at a time
+
+  curate:
+    threads:            8
+    evalue_rrna:        1.0e-20
+    evalue_protein:     1.0e-10
+    merge_gap_rrna:     500
+    merge_gap_protein:  3000
+    flank_rrna:         50
+    flank_protein:      0       # none: the span must stay in frame
+    # Only the N longest sample sequences are used as extra blast queries when
+    # locating the locus in a reference. The step-11 probes do most of the work;
+    # this is a cheap safety net for a locus whose probes are divergent.
+    max_sample_queries: 5
+    min_ref_len_nt:     200
+    max_ref_len_nt:     25000   # guard against an HSP chain crossing a whole genome
+    # Breadth over depth: cap how many records any one organism may contribute,
+    # then fill the quota round-robin across organisms. Without this a query for
+    # Rickettsia gltA returns 40 sequences of R. felis and no tree topology.
+    max_per_organism:   2
+    max_refs_per_locus: 40
+    max_outgroups:      3
+    # The outgroup is the most divergent sequence in the tree by construction,
+    # so it is NOT held to the panel's min_pident -- that floor is tuned to find
+    # a conspecific locus inside a contig. E-value and min_aln_len still apply,
+    # and the realised identity is reported in tree_reference_sequences.tsv.
+    outgroup_min_pident: 0
+    # A reference whose extracted locus carries an internal stop codon is a
+    # pseudogene or a mis-annotated region; it is dropped rather than aligned.
+    drop_internal_stops: true
+
+  align:
+    tool:             mafft
+    mafft_opts:       --auto --maxiterate 1000
+    mafft_rrna_opts:  --auto --adjustdirection --maxiterate 1000
+    codon_aware:      true
+    # Column trimming is OFF by default. Most sample sequences are fragments of
+    # the gene, so column occupancy is low everywhere and a gap-threshold trim
+    # removes real signal along with the noise. Set to `gappyout` or `gt:0.05`
+    # to enable trimal; the untrimmed alignment is always kept alongside.
+    trim:             none
+
+  tree:
+    tool:             fasttree
+    fasttree_nt_opts: -nt -gtr -gamma
+    # Below this many tips a tree is not worth building; the alignment is still
+    # written so the locus is not silently lost.
+    min_tips:         4
+    # outgroup_else_midpoint | midpoint | none
+    root:             outgroup_else_midpoint
+
+  figures:
+    width_in:          11
+    height_per_tip_in: 0.16
+    min_height_in:     6
+    # Support values below this are not drawn -- FastTree's SH-like local
+    # support, so 0.8 is the conventional "worth reading" floor.
+    min_support_shown: 0.8
+
+# ---------------------------------------------------------------------------
+# Blood-meal host identification (code/analysis/30-35, run_bloodmeal.sh).
+#
+# Each contig's vertebrate identity comes from the samples' existing nt BLAST
+# (blast/<sample>.blast.txt, scanned once by step 30) and contig LCA
+# (lca/<sample>.blast.lca). nt is competitive across all of life, so a contig
+# is called vertebrate only if its best vertebrate HSP falls inside the same
+# top-bitscore window the LCA used (lca_run.top_percent). A tick mitochondrial
+# contig that also hits a vertebrate mitogenome at 70% is therefore NOT read as
+# blood meal.
+#
+# Evidence tiers, per sample (step 34):
+#   1  mitochondrial genome / segment: vertebrate mtDNA contigs whose best
+#      HSP is >= tier1_min_aln bp
+#   2  only if tier 1 is empty: vertebrate 18S rRNA contigs, plus COI
+#      fragments shorter than the tier-1 floor (>= tier2_min_aln bp)
+# Every contig is named at its LCA, then capped at the deepest rank its best
+# identity supports (identity_caps; identity_caps_18s for 18S, which is too
+# conserved to separate genera and barely separates orders).
+#
+# mtDNA contigs are then RE-NAMED against a deeper reference set (steps
+# 33b/33c): the samples' nt BLAST kept only 10 subjects per contig, and on a
+# long host contig those are complete mitogenomes of congeners, which outscore
+# a 99% gene record of the right species (8398: 17 kb Notamacropus contig,
+# top-10 all non-rufogriseus mitogenomes at 95%). See `refine` below.
+# ---------------------------------------------------------------------------
+bloodmeal:
+  out_dir:     results/bloodmeal
+  host_fixes:  metadata/host_name_fixes.tsv
+
+  contig:
+    min_pident:     75      # below this a vertebrate HSP is not evidence at all
+    tier1_min_aln:  150     # bp, best vertebrate mtDNA HSP
+    tier2_min_aln:  50      # bp, 18S / short COI
+    # minimum best-HSP identity for a contig to be named at each rank (mtDNA)
+    identity_caps:  {species: 98, genus: 95, family: 90, order: 85}
+    # 18S differs by ~1% between mammalian orders: order needs >= 99.5%,
+    # otherwise the contig is named at class at most.
+    identity_caps_18s: {order: 99.5}
+    # RefSeq second opinion + gene span (step 33): blastn of each vertebrate
+    # mtDNA contig against results/bloodmeal/refs (step 31)
+    refseq_task:    dc-megablast
+    refseq_evalue:  1.0e-10
+    min_gene_overlap: 0.3   # fraction of a reference gene a contig must cover to list it
+    threads:        2
+
+  refine:
+    # Step 33b: every nt record with a mitochondrial title is fetched (Entrez)
+    # for each candidate host family = families named by step 33 on an mtDNA
+    # contig + every metadata host's family. Per species, at most this many
+    # records per gene label (longest first) and complete genomes:
+    max_per_species_gene:    3
+    max_genomes_per_species: 2
+    min_len:  150
+    max_len:  25000
+    # A family with more mito records than this (Hominidae: ~250k human
+    # mtDNAs) is fetched as RefSeq + every record of its CANDIDATE genera
+    # (named on a contig or recorded as a host): Scincidae is too big to fetch
+    # whole, but Tiliqua must not be lost.
+    big_family_records: 30000
+    # Step 33c: blastn of the mtDNA contigs against those records + RefSeq.
+    task:            dc-megablast
+    evalue:          1.0e-20
+    max_target_seqs: 1000
+    # Identity vote: the contig is cut into windows; in each window the taxa
+    # within delta_pident of the best identity win it; the taxa winning the
+    # most windows name the contig (LCA on ties), capped by their identity.
+    window:             300
+    window_min_overlap: 0.5   # of the window, or of the HSP if shorter
+    min_aln:            100   # bp; shorter HSPs never vote
+    delta_pident:       0.5
+
+  call:
+    # A taxon must clear BOTH floors in a sample to be reported as a host.
+    min_contigs:  1
+    min_reads:    5         # mapped reads summed over its contigs (mapping/<s>.coverage.tsv)
+    # primary host = deepest rank at which one taxon holds this share of the
+    # sample's resolved weight at that rank
+    dominance:    0.8
+    # other hosts listed when they hold at least this share of the weight
+    secondary_min_share: 0.1
+    # Likely laboratory / reagent DNA. Reported, but excluded from the
+    # primary-host call unless they are the only vertebrate signal.
+    lab_contaminants: [Homo sapiens, Gallus gallus, Bos taurus, Sus scrofa]
+    # Index hopping / cross-sample bleed: a host family in a sample is flagged
+    # `cross_talk` when another sample on the SAME sequencing lane (metadata
+    # seq_run) carries >= this many times more reads of it. Flagged taxa are
+    # reported but kept out of the primary call, like lab contaminants. (8244,
+    # 44,753 reads of Testudinidae mtDNA, bleeds 2-441 reads into 5 lane-mates.)
+    cross_talk_ratio: 100

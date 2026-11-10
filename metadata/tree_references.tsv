@@ -1,0 +1,80 @@
+# Reference sequences for the marker-gene PHYLOGENIES (code/analysis/17..19).
+#
+# These are NOT the search probes in metadata/target_markers.tsv. Those exist
+# only so blastn/tblastn can find a locus inside a contig. THESE are the named
+# species that go into the tree next to your samples and give a tip its
+# identity -- type strains, described endosymbionts, and the published
+# tick-derived sequences the Australian literature is built on.
+#
+# Every query runs against nuccore and returns NUCLEOTIDE records, because the
+# trees are built on nucleotides. A record does not have to be a clean gene
+# record: step 18 blasts each one and cuts out the marker locus, so a whole
+# genome is a perfectly good source (see metadata/tree_ref_genomes.tsv, which
+# supplies genomes for every locus of a target).
+#
+# Step 18 then throws away anything that does not actually carry the locus at
+# the panel's min_pident / min_aln_len, so a loose query costs download time,
+# not correctness.
+#
+# COLUMNS
+#   target         must match a `target` in metadata/target_markers.tsv
+#   marker         must match that row's `marker`
+#   n_refs         how many records to KEEP from this query (after the
+#                  per-organism cap in config trees.curate.max_per_organism)
+#   query          Entrez nuccore term; ' ||| ' separates fallbacks, tried in
+#                  order until one returns records
+#   outgroup_n     how many outgroup records to keep (0 = none; the tree is
+#                  then midpoint-rooted)
+#   outgroup_query Entrez term for the outgroup, same rules
+#
+# A target x marker with sample sequences but NO row here still gets a tree:
+# step 17 falls back to an auto-generated query and marks it `auto` in the
+# manifest. Add a row here to do better than the guess.
+target	marker	n_refs	query	outgroup_n	outgroup_query
+Rickettsia	16S	30	Rickettsia[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN] ||| Rickettsia[Organism] AND 16S[Title] AND 1000:1700[SLEN]	2	Orientia[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]
+Rickettsia	gltA	40	Rickettsia[Organism] AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN] ||| Rickettsia[Organism] AND gltA[All Fields] AND 300:3000[SLEN]	2	Orientia[Organism] AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]
+Rickettsia	ompA	40	Rickettsia[Organism] AND (ompA[Gene] OR "outer membrane protein A"[Title] OR rOmpA[Title]) AND 300:7000[SLEN] ||| Rickettsia[Organism] AND ompA[All Fields] AND 300:7000[SLEN]	0	
+Rickettsia	ompB	40	Rickettsia[Organism] AND (ompB[Gene] OR sca5[Gene] OR "outer membrane protein B"[Title] OR rOmpB[Title]) AND 300:7000[SLEN] ||| Rickettsia[Organism] AND ompB[All Fields] AND 300:7000[SLEN]	0	
+Rickettsia	sca4	30	Rickettsia[Organism] AND (sca4[Gene] OR "cell surface antigen 4"[Title] OR "cell surface antigen Sca4"[Title] OR "gene D"[Title]) AND 300:5000[SLEN] ||| Rickettsia[Organism] AND sca4[All Fields] AND 300:5000[SLEN]	0	
+Rickettsia	groEL	30	Rickettsia[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title] OR "heat shock protein 60"[Title]) AND 300:3000[SLEN]	2	Orientia[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]
+Rickettsia	htrA_17kDa	30	Rickettsia[Organism] AND ("17 kDa"[Title] OR "17-kDa"[Title] OR htrA[Gene]) AND 200:2500[SLEN]	0	
+Anaplasma	16S	30	Anaplasma[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]	2	Ehrlichia[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]
+Anaplasma	groEL	30	Anaplasma[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title] OR "heat shock protein 60"[Title]) AND 300:3000[SLEN]	2	Ehrlichia[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]
+Anaplasma	msp4	30	Anaplasma[Organism] AND (msp4[Gene] OR "major surface protein 4"[Title]) AND 300:2000[SLEN]	0	
+Arsenophonus	16S	30	Arsenophonus[Organism] AND "16S ribosomal RNA"[Title] AND 1000:1700[SLEN]	2	(Providencia[Organism] OR Proteus[Organism]) AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]
+Babesia	cox1	30	(Babesia[Organism] OR Theileria[Organism]) AND (cox1[Gene] OR COX1[Gene] OR "cytochrome c oxidase subunit I"[Title] OR "cytochrome oxidase subunit 1"[Title]) AND 300:12000[SLEN]	2	Plasmodium[Organism] AND (cox1[Gene] OR "cytochrome c oxidase subunit I"[Title]) AND 300:8000[SLEN]
+Babesia	cytb	30	(Babesia[Organism] OR Theileria[Organism]) AND (cytb[Gene] OR COB[Gene] OR "cytochrome b"[Title]) AND 300:12000[SLEN]	2	Plasmodium[Organism] AND (cytb[Gene] OR "cytochrome b"[Title]) AND 300:8000[SLEN]
+Bartonella	gltA	30	Bartonella[Organism] AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]	2	Brucella[Organism] AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]
+Bartonella	rpoB	30	Bartonella[Organism] AND (rpoB[Gene] OR "RNA polymerase beta subunit"[Title] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]	2	Brucella[Organism] AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]
+Borrelia	16S	30	(Borrelia[Organism] OR Borreliella[Organism]) AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]	2	(Treponema[Organism] OR Leptospira[Organism]) AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]
+Borrelia	clpA	25	(Borrelia[Organism] OR Borreliella[Organism]) AND (clpA[Gene] OR "ATP-dependent Clp protease"[Title] OR "Clp protease ATP-binding"[Title]) AND 300:3000[SLEN]	0	
+Borrelia	flaB	30	(Borrelia[Organism] OR Borreliella[Organism]) AND (flaB[Gene] OR "flagellin B"[Title] OR "flagellar filament"[Title]) AND 300:2000[SLEN]	0	
+Borrelia	glpQ	25	(Borrelia[Organism] OR Borreliella[Organism]) AND (glpQ[Gene] OR "glycerophosphodiester phosphodiesterase"[Title]) AND 300:3000[SLEN]	0	
+Coxiella	16S	30	Coxiella[Organism] AND "16S ribosomal RNA"[Title] AND 1000:1700[SLEN]	2	Legionella[Organism] AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]
+Coxiella	rpoB	25	Coxiella[Organism] AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]	2	Legionella[Organism] AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]
+Coxiella	groEL	25	Coxiella[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]	2	Legionella[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]
+Coxiella	dnaK	25	Coxiella[Organism] AND (dnaK[Gene] OR "chaperone protein DnaK"[Title] OR "molecular chaperone DnaK"[Title] OR "heat shock protein 70"[Title]) AND 300:3000[SLEN]	2	Legionella[Organism] AND (dnaK[Gene] OR "chaperone protein DnaK"[Title] OR "molecular chaperone DnaK"[Title]) AND 300:3000[SLEN]
+Coxiella	icd	25	Coxiella[Organism] AND (icd[Gene] OR "isocitrate dehydrogenase"[Title]) AND 300:3000[SLEN]	2	Legionella[Organism] AND (icd[Gene] OR "isocitrate dehydrogenase"[Title]) AND 300:3000[SLEN]
+Coxiella	IS1111	25	Coxiella[Organism] AND (IS1111[All Fields] OR "insertion sequence"[Title] OR transposase[Title]) AND 200:3000[SLEN]	0	
+Cytauxzoon	cox1	30	(Cytauxzoon[Organism] OR Theileria[Organism] OR Babesia[Organism]) AND (cox1[Gene] OR COX1[Gene] OR "cytochrome c oxidase subunit I"[Title]) AND 300:12000[SLEN]	2	Plasmodium[Organism] AND (cox1[Gene] OR "cytochrome c oxidase subunit I"[Title]) AND 300:8000[SLEN]
+Cytauxzoon	cytb	30	(Cytauxzoon[Organism] OR Theileria[Organism] OR Babesia[Organism]) AND (cytb[Gene] OR COB[Gene] OR "cytochrome b"[Title]) AND 300:12000[SLEN]	2	Plasmodium[Organism] AND (cytb[Gene] OR "cytochrome b"[Title]) AND 300:8000[SLEN]
+Flaviviridae	VP1_glyco	25	(Jingmenvirus[Organism] OR "Jingmen tick virus"[All Fields] OR "Alongshan virus"[All Fields] OR "Yanggou tick virus"[All Fields] OR "Takachi virus"[All Fields]) AND ("segment 2"[Title] OR VP1[Title] OR glycoprotein[Title]) AND 500:5000[SLEN]	0	
+Flaviviridae	VP2_nucleo	25	(Jingmenvirus[Organism] OR "Jingmen tick virus"[All Fields] OR "Alongshan virus"[All Fields] OR "Yanggou tick virus"[All Fields] OR "Takachi virus"[All Fields]) AND ("segment 4"[Title] OR VP2[Title] OR VP3[Title] OR nucleoprotein[Title] OR capsid[Title]) AND 500:5000[SLEN]	0	
+Francisella	16S	30	Francisella[Organism] AND "16S ribosomal RNA"[Title] AND 1000:1700[SLEN]	2	(Allofrancisella[Organism] OR Fangia[Organism] OR Piscirickettsia[Organism]) AND "16S ribosomal RNA"[Title] AND 1200:1700[SLEN]
+Francisella	rpoB	25	Francisella[Organism] AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]	2	(Allofrancisella[Organism] OR Fangia[Organism]) AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]
+Francisella	sdhA	25	Francisella[Organism] AND (sdhA[Gene] OR "succinate dehydrogenase flavoprotein"[Title]) AND 300:3000[SLEN]	0	
+Francisella	groEL	25	Francisella[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]	2	(Allofrancisella[Organism] OR Fangia[Organism]) AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]
+Hepatozoon	18S	30	Hepatozoon[Organism] AND ("18S ribosomal RNA"[Title] OR "small subunit ribosomal RNA"[Title]) AND 500:2500[SLEN]	2	(Adelina[Organism] OR Eimeria[Organism] OR Toxoplasma[Organism]) AND ("18S ribosomal RNA"[Title] OR "small subunit ribosomal RNA"[Title]) AND 1000:2500[SLEN]
+Hepatozoon	cox1	25	(Hepatozoon[Organism] OR Hemolivia[Organism]) AND (cox1[Gene] OR COX1[Gene] OR "cytochrome c oxidase subunit I"[Title]) AND 300:8000[SLEN]	2	Plasmodium[Organism] AND (cox1[Gene] OR "cytochrome c oxidase subunit I"[Title]) AND 300:8000[SLEN]
+Midichloria	16S	25	(Midichloria[Organism] OR Midichloriaceae[Organism]) AND "16S ribosomal RNA"[Title] AND 1000:1700[SLEN]	2	Rickettsia[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1600[SLEN]
+Midichloria	ftsZ	20	(Midichloria[Organism] OR Midichloriaceae[Organism]) AND (ftsZ[Gene] OR "cell division protein FtsZ"[Title]) AND 300:3000[SLEN]	2	Rickettsia[Organism] AND (ftsZ[Gene] OR "cell division protein FtsZ"[Title]) AND 300:3000[SLEN]
+Midichloria	gltA	20	(Midichloria[Organism] OR Midichloriaceae[Organism]) AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]	2	Rickettsia[Organism] AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]
+Midichloria	groEL	20	(Midichloria[Organism] OR Midichloriaceae[Organism]) AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]	2	Rickettsia[Organism] AND (groEL[Gene] OR "chaperonin GroEL"[Title] OR "60 kDa chaperonin"[Title]) AND 300:3000[SLEN]
+Orthomyxoviridae	PB1	25	(Quaranjavirus[Organism] OR Thogotovirus[Organism] OR Orthomyxoviridae[Organism]) AND (PB1[Title] OR "polymerase basic protein 1"[Title] OR "segment 2"[Title]) AND 1000:3000[SLEN]	0	
+Phenuiviridae	N	25	(Uukuvirus[Organism] OR Phlebovirus[Organism] OR Bandavirus[Organism] OR Phenuiviridae[Organism]) AND (nucleoprotein[Title] OR nucleocapsid[Title] OR "segment S"[Title] OR "S segment"[Title]) AND 500:3000[SLEN]	0	
+Rhabdoviridae	RdRp_L	25	Rhabdoviridae[Organism] AND ("large protein"[Title] OR "L protein"[Title] OR "RNA-dependent RNA polymerase"[Title] OR "complete genome"[Title]) AND 3000:16000[SLEN]	0	
+Rickettsiella	16S	25	(Rickettsiella[Organism] OR Diplorickettsia[Organism]) AND "16S ribosomal RNA"[Title] AND 1000:1700[SLEN]	2	Coxiella[Organism] AND "16S ribosomal RNA"[Title] AND 1300:1700[SLEN]
+Rickettsiella	ftsZ	20	(Rickettsiella[Organism] OR Diplorickettsia[Organism]) AND (ftsZ[Gene] OR "cell division protein FtsZ"[Title]) AND 300:3000[SLEN]	2	Coxiella[Organism] AND (ftsZ[Gene] OR "cell division protein FtsZ"[Title]) AND 300:3000[SLEN]
+Rickettsiella	gltA	20	(Rickettsiella[Organism] OR Diplorickettsia[Organism]) AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]	2	Coxiella[Organism] AND (gltA[Gene] OR "citrate synthase"[Title]) AND 300:3000[SLEN]
+Rickettsiella	rpoB	20	(Rickettsiella[Organism] OR Diplorickettsia[Organism]) AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]	2	Coxiella[Organism] AND (rpoB[Gene] OR "DNA-directed RNA polymerase subunit beta"[Title]) AND 300:6000[SLEN]
+Trypanosoma	18S	30	Trypanosoma[Organism] AND ("18S ribosomal RNA"[Title] OR "small subunit ribosomal RNA"[Title]) AND 1000:3000[SLEN]	2	Leishmania[Organism] AND ("18S ribosomal RNA"[Title] OR "small subunit ribosomal RNA"[Title]) AND 1000:3000[SLEN]

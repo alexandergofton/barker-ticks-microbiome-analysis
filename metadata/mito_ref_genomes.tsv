@@ -1,0 +1,120 @@
+# Published tick mitogenomes used as named-species references in the mitogenome
+# phylogeny (code/analysis/20b_fetch_mito_ref_genomes.py, run_mito.sh).
+#
+# Curated from results/mito/mito_ref_seqs.txt (the raw list, 121 lines). Every
+# line of that list is accounted for here: one row per distinct accession, with
+# use=no and a reason for anything not downloaded. `listed_as` is the line as it
+# appeared in the raw list. Species/genus/subgenus follow the raw list (they
+# match the curated sample metadata's naming, e.g. Amblyomma fimbriatum rather
+# than GenBank's Aponomma fimbriatum); where GenBank's organism name differs it
+# is recorded in `note`.
+#
+# Step 20b checks that each downloaded record's GenBank title contains the
+# expected species epithet (or the `genbank_check` override) and refuses the
+# record otherwise -- that check is what caught NC_028521 below.
+#
+# family drives tree rooting (mito.tree.outgroup_family in the config).
+accession	use	family	genus	subgenus	species	genbank_check	listed_as	note
+KR907248	yes	Nuttalliellidae	Nuttalliella		Nuttalliella namaqua		Nuttalliella namaqua KR907248
+KJ133584	yes	Argasidae	Argas	Persicargas	Argas walkerae		Argas (Persicargas) walkerae KJ133584
+NC_019642	yes	Argasidae	Argas	Argas	Argas africolumbae		Argas (Argas) africolumbae NC_019642
+KR907242	yes	Argasidae	Navis		Navis striatus		Navis striatus KR907242
+KY457524	yes	Argasidae	Secretargas		Secretargas transgariepinus		Secretargas transgariepinus KY457524
+KR907229	yes	Argasidae	Ogadenus	Ogadenus	Ogadenus brumpti		Ogadenus (Ogadenus) brumpti KR907229
+KR907236	yes	Argasidae	Chiropterargas		Chiropterargas boueti		Chiropterargas boueti KR907236
+KJ133592	yes	Argasidae	Otobius		Otobius megnini		Otobius megnini KJ133592
+KR907257	yes	Argasidae	Ornithodoros	Pavlovskyella	Ornithodoros zumpti		Ornithodoros (Pavlovskyella) zumpti KR907257
+KJ133591	yes	Argasidae	Ornithodoros	Pavlovskyella	Ornithodoros costalis		Ornithodoros (Pavlovskyella) costalis KJ133591
+KJ133590	yes	Argasidae	Ornithodoros	Ornithodoros	Ornithodoros compactus		Ornithodoros (Ornithodoros) compactus KJ133590
+MG593161	yes	Argasidae	Ornithodoros	Ornamentum	Ornithodoros coriaceus		Ornithodoros (Ornamentum) coriaceus MG593161
+KR907245	yes	Argasidae	Alectorobius		Alectorobius capensis	Alectorobius capensis	Alectorobius capensis KR907245
+NC_023340	yes	Argasidae	Antricola	Antricola	Antricola mexicanus		Antricola (Antricola) mexicanus NC_023340
+MH043271	yes	Ixodidae	Ixodes	Endopalpiger	Ixodes tasmani		Ixodes (Endopalpiger) tasmani MH043271	isolate A6
+NC_041086	yes	Ixodidae	Ixodes		Ixodes tasmani		Ixodes tasmani NC_041086	isolate B6; a different specimen from MH043271, kept
+NC_006078	yes	Ixodidae	Ixodes	Ceratixodes	Ixodes uriae		Ixodes (Ceratixodes) uriae NC_006078
+NC_005293	yes	Ixodidae	Ixodes	Sternalixodes	Ixodes holocyclus		Ixodes (Sternalixodes) holocyclus NC_005293
+KY457530	yes	Ixodidae	Ixodes	Afrixodes	Ixodes rubicundus		Ixodes (Afrixodes) rubicundus KY457530
+OL741746	yes	Ixodidae	Ixodes		Ixodes columnae		Ixodes columnae OL741746
+KY457531	yes	Ixodidae	Ixodes	Pomerantzevella	Ixodes simplex		Ixodes (Pomerantzevella) simplex KY457531
+JN248424	yes	Ixodidae	Ixodes	Ixodes	Ixodes ricinus		Ixodes (Ixodes) ricinus JN248424
+NC_018369	no	Ixodidae	Ixodes		Ixodes ricinus		Ixodes ricinus NC_018369	duplicate: RefSeq copy of JN248424 (same specimen, same 14,566 bp)
+NC_004370	yes	Ixodidae	Ixodes	Ixodes	Ixodes persulcatus		Ixodes (Ixodes) persulcatus NC_004370
+OL741747	yes	Ixodidae	Ixodes	Ixodes	Ixodes pavlovskyi		Ixodes (Ixodes) pavlovskyi OL741747
+NC_002010	yes	Ixodidae	Ixodes		Ixodes hexagonus		Ixodes hexagonus NC_002010
+NC_017758	yes	Ixodidae	Robertsicus		Robertsicus elaphensis		Robertsicus elaphensis NC_017758 (listed twice)
+MT371796	yes	Ixodidae	Africaniella		Africaniella transversale	transversale	Africaniella transversale MT371796	GenBank: UNVERIFIED Amblyomma transversale
+NC_017757	yes	Ixodidae	Bothriocroton		Bothriocroton undatum		Bothriocroton undatum NC_ 017757 (listed twice)	accession typo in list ("NC_ 017757")
+NC_017756	yes	Ixodidae	Bothriocroton		Bothriocroton concolor		Bothriocroton concolor NC_017756 (listed twice)
+NC_017745	yes	Ixodidae	Archaeocroton		Archaeocroton sphenodonti		Archaeocroton sphenodonti NC_017745 (listed twice)
+MT371803	yes	Ixodidae	Haemaphysalis	Alloceraea	Haemaphysalis kitaokai		Haemaphysalis (Alloceraea) kitaokai MT371803	GenBank: UNVERIFIED
+NC_020335	yes	Ixodidae	Haemaphysalis	Alloceraea	Haemaphysalis inermis		Haemaphysalis (Alloceraea) inermix NC_020335 (listed twice)	"inermix" in list = H. inermis
+OL741745	yes	Ixodidae	Haemaphysalis	Kaiseriana	Haemaphysalis yeni		Haemaphysalis (Kaiseriana) yeni OL741745
+MT371802	yes	Ixodidae	Haemaphysalis	Kaiseriana	Haemaphysalis cornigera		Haemaphysalis (Kaiseriana) cornigera MT37180	truncated in list ("MT37180"); MT371802 is the only H. cornigera record in that MT3718xx series. GenBank: UNVERIFIED
+MT371805	yes	Ixodidae	Haemaphysalis	Haemaphysalis	Haemaphysalis pentalagi		Haemaphysalis (Haemaphysalis) pentalagi MT371805	GenBank: UNVERIFIED
+NC_037493	yes	Ixodidae	Haemaphysalis	Kaiseriana	Haemaphysalis longicornis		Haemaphysalis (Kaiseriana) longicornis NC_037493
+OL741743	yes	Ixodidae	Haemaphysalis	Kaiseriana	Haemaphysalis hystricis		Haemaphysalis (Kaiseriana) hystricis OL741743
+NC_039765	yes	Ixodidae	Haemaphysalis		Haemaphysalis hystricis		Haemaphysalis hystricis NC_039765	a different specimen from OL741743, kept
+NC_020334	yes	Ixodidae	Haemaphysalis	Aborphysalis	Haemaphysalis formosensis		Haemaphysalis (Aborphysalis) formosensis NC_020334 (listed twice)
+OL741740	yes	Ixodidae	Haemaphysalis	Haemaphysalis	Haemaphysalis concinna		Haemaphysalis (Haemaphysalis) concinna OL741740
+NC_005292	yes	Ixodidae	Haemaphysalis	Haemaphysalis	Haemaphysalis flava		Haemaphysalis (Haemaphysalis) flava NC_005292
+MT371804	yes	Ixodidae	Haemaphysalis	Haemaphysalis	Haemaphysalis megaspinosa		Haemaphysalis (Haemaphysalis) megaspinosa MT371804	GenBank: UNVERIFIED
+NC_037246	yes	Ixodidae	Haemaphysalis	Haemaphysalis	Haemaphysalis japonica		Haemaphysalis (Haemaphysalis) japonica NC_037246 (listed twice)
+NC_041076	yes	Ixodidae	Haemaphysalis		Haemaphysalis bancrofti		Haemaphysalis bancrofti NC_041076
+NC_050255	yes	Ixodidae	Amblyomma	Anastosiella	Amblyomma ovale		Amblyomma (Anostosiella) ovale NC_050255 (listed twice)
+NC_032369	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma sculptum		Amblyomma (Amblyomma) sculptum NC_032369
+OP901706	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma sculptum		Amblyomma (Amblyomma) sculptum OP901706	a different specimen from NC_032369, kept
+NC_020333	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma cajennense		Amblyomma (Amblyomma) cajennense NC_020333
+OP901707	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma cajennense		Amblyomma (Amblyomma) cajennense OP901707	a different specimen from NC_020333, kept
+OP901704	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma patinoi		Amblyomma (Amblyomma) patinoi OP901704
+OP901702	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma mixtum		Amblyomma (Amblyomma) mixtum OP901702
+OP901705	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma tonelliae		Amblyomma (Amblyomma) tonelliae OP901705
+NC_027609	yes	Ixodidae	Amblyomma	Amblyomma	Amblyomma americanum		Amblyomma (Amblyomma) americanum NC_027609 (listed twice)
+NC_005963	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma triguttatum		Amblyomma (Cernyomma) triguttatum NC_005963 (listed twice)
+OL741736	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma nuttalli		Amblyomma (Xiphiastor) nuttalli OL741736 (listed twice)
+KY457515	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma marmoreum		Amblyomma (Xiphiastor) marmoreum KY457515 (listed twice)
+KY457513	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma hebraeum		Amblyomma (Xiphiastor) hebraeum KY457513 (listed twice)
+KY457521	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma tholloni		Amblyomma (Xiphiastor) tholloni KY457521
+KY457522	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma tholloni		Amblyomma (Xiphiastor) tholloni KY457522	second A. tholloni clone, kept as listed
+OQ842962	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma sparsum		Amblyomma (Xiphiastor) sparsum OQ842962
+NC_017759	yes	Ixodidae	Amblyomma	Aponomma	Amblyomma fimbriatum		Amblyomma (Aponomma) fimbriatum NC_017759 (listed three times)	GenBank: Aponomma fimbriatum
+MT371798	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma testudinarium		Amblyomma (Xiphiastor) testudinarium MT371798	GenBank: UNVERIFIED
+MT029329	yes	Ixodidae	Amblyomma	Xiphiastor	Amblyomma testudinarium		Amblyomma (Xiphiastor) testudinarium MT029329	a different specimen from MT371798, kept
+MT371797	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma geoemydae		Amblyomma (Cernyomma) geoemydae MT3717	truncated in list ("MT3717"); MT371797 is the only A. geoemydae record in that MT3718xx/MT3717xx series. GenBank: UNVERIFIED
+MK814531	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma geoemydae		Amblyomma (Cernyomma) geoemydae MK814531
+OL741735	yes	Ixodidae	Amblyomma	Aponomma	Amblyomma latum		Amblyomma (Aponomma) latum OL74173 / OL741735	first listing truncated ("OL74173"); second gives OL741735
+OL741734	yes	Ixodidae	Amblyomma	Aponomma	Amblyomma gervaisi		Amblyomma (Aponomma) gervaisi OL741734 (listed twice)
+NC_088057	no	Ixodidae	Amblyomma	Cernyomma	Amblyomma limbatum		Amblyomma limbatum voucher B6548  NC_088057.1	duplicate: RefSeq copy of OR416215 (same voucher B6548)
+OR416215	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma limbatum		Amblyomma (Cernyomma) limbatum OR416215
+OR899807	yes	Ixodidae	Amblyomma	Dermiomma	Amblyomma naponense		Amblyomma (Dermiomma) naponense OR899807
+OR899812	yes	Ixodidae	Amblyomma	Adenopleura	Amblyomma parvum		Amblyomma (Adenopleura) parvum OR899812
+OR899811	yes	Ixodidae	Amblyomma	Anastosiella	Amblyomma neumanni		Amblyomma (Anastosiella) neumanni OR899811
+OR899806	yes	Ixodidae	Amblyomma		Amblyomma boeroi		Amblyomma boeroi OR899806
+OR899810	yes	Ixodidae	Amblyomma	Anastosiella	Amblyomma parvitarsum		Amblyomma (Anastosiella) parvitarsum OR899810
+OR899805	yes	Ixodidae	Amblyomma	Walkeriana	Amblyomma argentinae		Amblyomma (Walkeriana) argentinae OR899805
+OR899808	yes	Ixodidae	Amblyomma	Dermiomma	Amblyomma dubitatum		Amblyomma (Dermiomma) dubitatum OR899808
+OR350526	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma nitidum		Amblyomma (Cernyomma) nitidum OR350526
+OR416214	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma breviscutatum		Amblyomma (Cernyomma) breviscutatum OR416214
+OR350527	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma postoculatum		Amblyomma (Cernyomma) postoculatum OR350527
+OR350524	yes	Ixodidae	Amblyomma	Cernyomma	Amblyomma albolimbatum		Amblyomma (Cernyomma) albolimbatum OR350524
+MW719251	yes	Ixodidae	Amblyomma	Anastosiella	Amblyomma maculatum		Amblyomma (Anastosiella) maculatum MW719251
+NC_043872	yes	Ixodidae	Amblyomma	Adenopleura	Amblyomma javanense		Amblyomma (Adenopleura) javanense NC_043872
+SRR4301110	no	Ixodidae	Amblyomma	Anastosiella	Amblyomma aureolatum		Amblyomma (Anastosiella) aureolatum SRR4301110	SRA read run, not an assembled genome; would need its mitogenome assembled from reads first
+SRR8074777	no	Ixodidae	Amblyomma	Cernyomma	Amblyomma aff. moreliae		Amblyomma (Cernyomma) aff. Moreliae SRR8074777	SRA read run, not an assembled genome; would need its mitogenome assembled from reads first
+KC503261	yes	Ixodidae	Rhipicephalus	Boophilus	Rhipicephalus microplus		Rhipicephalus (Boophilus) microplus KC50326:	list entry malformed ("KC50326:"); KC503261 is the R. microplus mitogenome in that series (isolate BomiB)
+NC_023335	no	Ixodidae	Rhipicephalus	Boophilus	Rhipicephalus microplus		Rhipicephalus microplus NC_023335	duplicate: RefSeq copy of KC503261 (same isolate BomiB)
+KY457537	yes	Ixodidae	Rhipicephalus	Digineus	Rhipicephalus evertsi		Rhipicephalus (Digineus) evertsi KY45753	truncated in list ("KY45753"); both KY457537 and KY457538 are R. evertsi clones from the same study -- KY457537 used
+NC_002074	yes	Ixodidae	Rhipicephalus	Rhipicephalus	Rhipicephalus sanguineus		Rhipicephalus (Rhipicephalus) sanguineus NC_002074 (listed twice)
+NC_023350	yes	Ixodidae	Rhipicephalus		Rhipicephalus geigyi		Rhipicephalus geigyi NC_023350
+NC_039828	yes	Ixodidae	Rhipicentor		Rhipicentor nuttalli		Rhipicentor nuttalli NC_039828
+KY457528	yes	Ixodidae	Hyalomma		Hyalomma rufipes		Hyalomma rufipes KY457528
+MW884229	yes	Ixodidae	Hyalomma		Hyalomma rufipes		Hyalomma rufipes MW884229	a different specimen from KY457528, kept
+KY457529	yes	Ixodidae	Hyalomma		Hyalomma truncatum		Hyalomma truncatum KY457529
+MF101817	yes	Ixodidae	Hyalomma		Hyalomma asiaticum		Hyalomma asiaticum asiaticum MF101817
+NC_028521	no	Ixodidae	Dermacentor		Dermacentor nuttalli		Dermacentor nuttalli NC_028521	WRONG RECORD: NC_028521 is the frog Rana huanrensis. Replaced by NC_028528 (next row)
+NC_028528	yes	Ixodidae	Dermacentor		Dermacentor nuttalli		(replaces NC_028521)	the D. nuttalli RefSeq mitogenome; listed accession NC_028521 is a frog (one-digit typo)
+NC_026552	yes	Ixodidae	Dermacentor		Dermacentor silvarum		Dermacentor sultarum CC 0326552 / Dermacentor silvarum NC_026552	first listing garbled ("sultarum", "CC 0326552")
+MT371801	yes	Ixodidae	Dermacentor		Dermacentor marginatus		Dermacentor marginatus MT371801	GenBank: UNVERIFIED
+MT371800	yes	Ixodidae	Dermacentor		Dermacentor taiwanensis	Dermacentor bellulus	Dermacentor taiwanensis MT371800	CHECK: GenBank organism is Dermacentor bellulus (UNVERIFIED), not D. taiwanensis; labelled as listed
+NC_023349	yes	Ixodidae	Dermacentor		Dermacentor nitens		Dermacentor nitens NC_023349 (listed twice)
+KY457527	yes	Ixodidae	Dermacentor		Dermacentor rhinocerinus		Dermacentor rhinocerinus KY457527
+NC_042764	yes	Ixodidae	Dermacentor		Dermacentor everestianus		Dermacentor everestianus NC_042764

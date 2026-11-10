@@ -1,0 +1,1953 @@
+---
+title: "Microbiome, endosymbionts and pathogens of Australian ticks"
+subtitle: "Barker tick collection — the complete analysis pipeline: code, decisions and results"
+author: "Alexander Gofton"
+date: today
+date-format: "D MMMM YYYY"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    toc-expand: 1
+    number-sections: true
+    code-fold: true
+    code-summary: "Show the code that produced this"
+    code-tools: true
+    code-overflow: scroll
+    embed-resources: true
+    theme:
+      light: cosmo
+      dark: darkly
+    fig-align: center
+    fig-responsive: true
+    smooth-scroll: true
+    link-external-newwindow: true
+    callout-appearance: simple
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| code-summary: "Report set-up: libraries, paths and the helpers used throughout"
+#
+# This report does NOT re-run the pipeline. The pipeline is a set of
+# standalone scripts under code/analysis/ (several steps run on the Slurm
+# cluster for hours, BLAST outputs reach 150 GB). The report reads what
+# those scripts wrote under results/ and metadata/, and shows the full
+# source of every script beside its results. Every number quoted in the text
+# is computed from those files at render time, so the prose cannot drift
+# from the outputs.
+#
+# Re-render after re-running any part of the pipeline:
+#   /data/hb-austick/work/miniforge3/envs/tick_report/bin/quarto render report/tick_microbiome_report.qmd
+
+suppressPackageStartupMessages({
+  library(data.table)   # all table handling
+  library(knitr)        # kable() for small tables
+  library(DT)           # searchable tables for anything long
+  library(ape)          # mitogenome tree in section 17
+  library(ggplot2)      # the palette figure in the software section
+})
+
+ROOT <- normalizePath("..")                       # project root (report/ is one below)
+R    <- function(...) file.path(ROOT, ...)        # absolute path inside the project
+REL  <- function(...) file.path("..", ...)        # relative path, for images
+
+# read a TSV from the project; returns NULL (not an error) if a step hasn't run
+rtsv <- function(...) {
+  p <- R(...)
+  if (!file.exists(p)) return(NULL)
+  fread(p, na.strings = c("", "NA"))
+}
+
+# Small tables print as static markdown; long ones become searchable,
+# sortable, paged widgets so the report stays readable.
+tbl <- function(d, caption = NULL, page = 12, digits = 3) {
+  if (is.null(d)) return(cat("*(table not produced: the step has not been run)*\n"))
+  d <- as.data.frame(d)
+  num <- vapply(d, is.double, logical(1))
+  d[num] <- lapply(d[num], function(x) signif(x, digits + 1))
+  if (nrow(d) <= page) return(kable(d, caption = caption))
+  datatable(d, caption = caption, rownames = FALSE, filter = "top",
+            extensions = "Buttons",
+            options = list(pageLength = page, scrollX = TRUE, dom = "Bfrtip",
+                           buttons = c("copy", "csv")))
+}
+
+# A pipeline figure; relative path so Quarto can embed it in the HTML
+fig <- function(...) include_graphics(REL("results", "figures", ...))
+
+# Show the complete source of a pipeline script in a collapsible block.
+# Used with `results: asis`. Four backticks so the scripts' own text can't
+# close the fence early.
+show_code <- function(rel, open = FALSE, note = NULL) {
+  p <- R(rel)
+  if (!file.exists(p)) return(cat(sprintf("\n*`%s` not found*\n", rel)))
+  x <- readLines(p, warn = FALSE)
+  lang <- switch(tools::file_ext(p), py = "python", R = "r", sh = "bash",
+                 yaml = "yaml", yml = "yaml", tsv = "default", "default")
+  cat(sprintf(paste0(
+    "\n<details class=\"pipeline-code\"%s><summary>&#128196; <code>%s</code> &nbsp;",
+    "<span style=\"color:var(--bs-secondary-color)\">%d lines%s</span></summary>\n\n",
+    "````{.%s .code-overflow-scroll}\n%s\n````\n\n</details>\n\n"),
+    if (open) " open" else "", rel, length(x),
+    if (is.null(note)) "" else paste0(" &middot; ", note),
+    lang, paste(x, collapse = "\n")))
+}
+
+pct <- function(x, d = 1) sprintf(paste0("%.", d, "f%%"), x)
+n_  <- function(x) format(x, big.mark = ",")
+params <- yaml::read_yaml(R("config", "analysis_params.yaml"))
+excl   <- fread(R("metadata", "excluded_samples.tsv"), skip = "sample_id")
+```
+
+```{css}
+#| echo: false
+details.pipeline-code { margin: .6rem 0 1rem; border: 1px solid var(--bs-border-color);
+  border-radius: 6px; padding: .3rem .8rem; }
+details.pipeline-code > summary { cursor: pointer; font-size: .92rem; }
+details.pipeline-code[open] > summary { margin-bottom: .4rem; }
+/* CSIRO Ocean Blue for the decision boxes (CSIRO_colours.R) */
+.decision { border-left: 4px solid #014B87; padding: .2rem .9rem; margin: .8rem 0;
+  background: color-mix(in srgb, #00A9CE 7%, transparent); }
+.decision > p:first-child::before { content: "Decision · "; font-weight: 600; color: #014B87; }
+```
+
+```{r}
+#| label: headline-numbers
+#| code-summary: "Headline numbers used in the overview"
+audit  <- rtsv("results", "audit", "sample_completeness.tsv")
+meta   <- rtsv("metadata", "sample_metadata.tsv")
+# identification changes against the metadata of the previous run
+old_meta <- rtsv("results", "_pre_exclusion_20261008", "metadata", "sample_metadata.tsv")
+id_fix <- merge(old_meta[, .(sample_id, previous = tick_species)],
+                meta[, .(sample_id, corrected = tick_species, notes)], by = "sample_id")[
+  is.na(previous) != is.na(corrected) | (!is.na(previous) & previous != corrected)]
+frac   <- rtsv("results", "tables", "fraction_summary.tsv")
+tsum   <- rtsv("results", "targets", "target_summary.tsv")
+n_all  <- nrow(audit)
+# samples in the abundance matrix = its columns. (fraction_summary.tsv has one
+# more row: a sample whose contigs all fail the evidence filter.)
+mat_ids <- names(fread(R("results", "matrices", "tpm_microbial_genus.tsv"), nrows = 0))[-1]
+n_mat  <- length(mat_ids)
+n_xy   <- sum(meta$has_coords == "yes")
+n_gen  <- uniqueN(na.omit(meta[sample_id %in% mat_ids]$tick_genus))
+n_sp   <- uniqueN(meta[sample_id %in% mat_ids & species_identified == "yes"]$tick_species)
+med_unassigned <- median(frac$tpm_pct_no_lca)
+```
+
+# Overview {#sec-overview}
+
+This document is the complete record of the analysis of the microbial communities,
+endosymbionts and pathogens in the Barker collection of Australian ticks. Each
+tick was sequenced as a whole-tick shotgun metagenome, then assembled, and the
+contigs were classified by BLAST plus a lowest-common-ancestor (LCA) call.
+
+| | |
+|---|---|
+| samples catalogued | **`r n_all`** |
+| samples with abundance data (analysed) | **`r n_mat`** |
+| tick genera / identified species among analysed samples | **`r n_gen` / `r n_sp`** |
+| samples with GPS coordinates | **`r n_xy`** |
+| median share of each library with *no* BLAST hit | **`r pct(med_unassigned)`** of TPM |
+
+**How to read this document.**
+
+* Every step has the same shape: what it is for → the **decisions** taken (blue
+  boxes) → the **full source code** (fold-out boxes marked &#128196;) → the
+  **results** it produced → how to read them.
+* Code that *this report* runs to draw tables is folded under "Show the code
+  that produced this". Pipeline scripts are in the &#128196; boxes. Both are
+  commented line by line, and the comments are part of the documentation.
+* Long tables are searchable and sortable, and can be copied or saved as CSV
+  with the buttons above them.
+* Section numbers follow the pipeline. The pipeline's own step numbers (`00`,
+  `04b`, `10b`…) are given in each heading.
+
+## What changed in this version {#sec-changes}
+
+This version re-runs every analysis after a review of the mitogenome results
+(@sec-mito-audit):
+
+* **`r nrow(excl)` samples were removed from every analysis** (microbiome,
+  markers, trees, mitogenome). They are listed with reasons in
+  `metadata/excluded_samples.tsv` and in @sec-audit. Most hold a different tick
+  from the one recorded, or a mixture of two.
+* **Tick identifications were corrected** in the curated metadata for
+  `r nrow(id_fix)` samples, using the mitogenome and nuclear-rRNA evidence
+  (@sec-metadata).
+* **Step 21 now selects only tick mitogenome contigs.** A candidate contig must
+  have a tick (Ixodida) nt-BLAST LCA, and ties are broken by coverage. Before
+  this fix, blood-meal and bacterial contigs were chosen for 7 samples.
+* **A new step 26c audits every genus-discordant sample.** It uses the sample's
+  nuclear rRNA hits to decide between "contaminant mitogenome", "mixed tube"
+  and "wrong tick".
+* **Every figure now uses one style**: `theme_classic()` with light-grey major
+  gridlines, and colour-blind-checked palettes built from the CSIRO brand
+  colours (@sec-colours).
+
+## The pipeline at a glance
+
+```{mermaid}
+%%| fig-width: 9
+flowchart TD
+  A[assemblies<br/>contigs/] --> B[BLAST vs nt<br/>blast/]
+  B --> C[LCA per contig<br/>lca/ · step 01 / lca_stream]
+  A --> D[reads mapped to own contigs<br/>mapping/ · step 02]
+  C --> E[03 taxonomy:<br/>lineage, scope, contaminant flag]
+  C & D --> F[04 join + evidence filter<br/>TPM renormalised within microbes]
+  E --> F
+  F --> G[07 TreeSummarizedExperiment]
+  M[barker_microbe_analysis_metadata.csv] --> M5[05b import + 06 validate]
+  M5 --> G
+  G --> H[08 composition]
+  G --> I[09 diversity + PERMANOVA]
+  F --> J[10 pathogen / endosymbiont targets]
+  G & J --> K[10b tick genus/species comparison]
+  M5 & J --> L[10c sampling maps]
+  J --> N[11–16 marker genes] --> O[17–19b marker-gene trees]
+  R[97 published tick mitogenomes<br/>20b download + annotate] --> P
+  A --> P[20–25 tick mitogenome phylogeny] --> Q[26 / 26b tree + check vs metadata]
+  M5 --> Q
+  Q --> Q2[26c audit: contaminant, mixed or wrong tick?]
+  X[excluded_samples.tsv] --> Z[00 audit: status excluded_manual]
+  Z --> F
+```
+
+## Three things to know before reading any result {#sec-caveats}
+
+::: {.callout-important}
+## 1 · Most of every library is unidentifiable, by design of the reference database
+A median of **`r pct(med_unassigned)`** of each sample's TPM sits on contigs
+with no BLAST hit at all. Australian tick genomes are essentially absent from
+`nt`, so the tick's own DNA, which is most of a whole-tick homogenate, gets no
+hit. An independent read-level classifier (Kraken2) leaves the same bulk
+unclassified. **No statement of the form "X % of this tick is microbial" is
+supportable.** The analysis unit is therefore `tpm_microbial`: abundance
+renormalised *within the microbial fraction*, which never uses the unassigned
+bulk as a denominator.
+:::
+
+::: {.callout-important}
+## 2 · There are no negative controls
+No extraction blanks or no-template controls were sequenced. Composition is
+**descriptive**. Reagent-contaminant genera are **annotated, never removed**
+(`metadata/reagent_contaminants.tsv`), and every figure carries this caveat.
+:::
+
+::: {.callout-important}
+## 3 · Abundance and evidence are different things
+TPM is length-normalised, so a 400 bp contig with 6 reads can outrank a whole
+genome. **A taxon is called *present* only when its read and contig evidence
+clear fixed thresholds** (≥ `r params$taxon_filter$min_contigs_per_taxon`
+contig and ≥ `r params$taxon_filter$min_reads_per_taxon` reads). Read counts
+gate presence calls and are **never** used as an abundance.
+:::
+
+# Software, configuration and how to reproduce {#sec-env}
+
+Three conda environments are used, each for a reason:
+
+| env | used for | why separate |
+|---|---|---|
+| system `python3` (pandas, taxopy) | steps 00–05b, 10, 11–25 | no R needed |
+| `tick_micro` (`env/tick_micro.yml`) | R steps 06–10b, 19b, 26, 26b | R 4.3 / Bioconductor 3.18 (mia 1.10), pinned |
+| `tick_markers` (`env/tick_markers.yml`) | BLAST+, MAFFT, FastTree, IQ-TREE | bioinformatics binaries |
+| `tick_report` (`env/tick_report.yml`) | maps (10c) and this report | sf / leaflet / Quarto, no Bioconductor |
+
+::: {.decision}
+**Maps and the report live in their own environment.** Adding the spatial
+packages (`sf`, `leaflet`) to `tick_micro` made the solver upgrade the whole
+environment: R 4.3 → 4.4, mia 1.10 → 1.14, ggplot2 3.5 → 4.0. That transaction
+then failed on a Bioconductor data package and was rolled back. Rather than
+silently change the version of every package the analysis was built on, the
+analysis environment was left pinned. Maps and the report, which read only
+TSV/PNG outputs, got their own small environment.
+:::
+
+**To reproduce everything after the cluster backfills:**
+
+```bash
+bash run_all.sh       # steps 0, 3-10c  (tables, TSE, figures, comparisons, maps)
+bash run_markers.sh   # steps 11-16     (marker genes for each target)
+bash run_trees.sh     # steps 17-19b    (marker-gene trees)
+bash run_mito.sh      # steps 20-26     (tick mitogenome phylogeny, incl. 20b references)
+Rscript code/analysis/26b_mito_vs_metadata.R
+quarto render report/tick_microbiome_report.qmd
+```
+
+**All thresholds live in one file.** No script hard-codes a threshold, so the
+configuration below *is* the methods section.
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("config/analysis_params.yaml", note = "every threshold used anywhere")
+show_code("run_all.sh", note = "the main driver")
+show_code("env/tick_micro.yml"); show_code("env/tick_report.yml")
+```
+
+## Figure style and colour {#sec-colours}
+
+Every figure is drawn with `theme_classic()` plus light-grey major gridlines in
+both directions (`theme_tick()` in `code/analysis/common.R`). All colours come
+from the CSIRO palette in `CSIRO_colours.R`.
+
+::: {.decision}
+**The CSIRO colours were chosen and ordered by computation, not by eye.** Each
+candidate set was simulated under protanopia and deuteranopia
+(Machado–Oliveira–Fernandes 2009) and scored by colour difference (OKLab ΔE).
+The nine hues below keep **every pair** at ΔE ≥ 8.7 under both deficiencies and
+≥ 15.8 under normal vision, and the first *k* slots are the best-separated set
+of *k*. That makes all nine safe to use together, even in a scatter plot where
+any two colours can sit side by side. Steel grey was rejected for "other"
+because it collapses onto Mint and Fuchsia under deuteranopia; Mist is used
+instead.
+:::
+
+::: {.decision}
+**Colour is never the only cue.** Several CSIRO hues are very light (Gold,
+Light Mint) or very dark (Midnight Blue) and cannot be lightened or darkened
+without leaving the brand palette. Every filled mark therefore has a dark
+outline, and every figure also encodes identity by shape, facet or a direct
+label. A categorical figure never shows more than nine colours: beyond that,
+the rest fold into "other" (Mist). Magnitudes (heatmaps) use a single-hue
+white → Midday Blue → Ocean Blue → Midnight Blue ramp, which reads correctly
+under any colour-vision type.
+:::
+
+```{r}
+#| label: palette-figure
+#| code-summary: "Draw the palettes"
+#| fig-width: 9
+#| fig-height: 3.4
+#| fig-cap: "The palettes used in every figure. Top: the nine categorical CSIRO slots in their fixed order, with 'other'. Middle: the tick-genus colours. Bottom: the sequential ramp for magnitudes."
+local({
+  e <- new.env(); sys.source(R("CSIRO_colours.R"), envir = e)
+  cs  <- unlist(mget(ls(e), envir = e))
+  cat_names <- c("Blueberry", "Mint", "Gold", "MiddayBlue", "MidnightBlue", "Orange",
+                 "LightMint", "Fuschia", "Plum", "Mist")
+  genus <- c(Amblyomma = "Mint", Ixodes = "Blueberry", Haemaphysalis = "Orange",
+             Bothriocroton = "Gold", Argas = "Fuschia", Ornithodoros = "Plum",
+             Alectorobius = "MiddayBlue", Cryptocroton = "LightMint",
+             Rhipicephalus = "MidnightBlue", unidentified = "Mist")
+  ramp <- colorRampPalette(c("#FFFFFF", "#CCEEF5", cs[c("MiddayBlue", "OceanBlue", "MidnightBlue")]))(9)
+  d <- rbind(
+    data.table(row = "categorical slots", x = seq_along(cat_names),
+               lab = sprintf("%s\n%s", c(seq_len(9), "other"), cat_names), col = cs[cat_names]),
+    data.table(row = "tick genus", x = seq_along(genus), lab = names(genus), col = cs[genus]),
+    data.table(row = "sequential", x = 1:9, lab = "", col = ramp))
+  d[, row := factor(row, levels = c("categorical slots", "tick genus", "sequential"))]
+  ggplot(d, aes(x, row)) +
+    geom_tile(aes(fill = col), colour = cs[["MidnightBlue"]], linewidth = 0.3, width = 0.95, height = 0.8) +
+    geom_text(aes(label = lab), size = 2.3, vjust = 2.6, lineheight = 0.85) +
+    scale_fill_identity() + scale_y_discrete(limits = rev, expand = expansion(add = c(0.9, 0.5))) +
+    labs(x = NULL, y = NULL) + theme_classic(base_size = 10) +
+    theme(axis.text.x = element_blank(), axis.ticks = element_blank(), axis.line = element_blank())
+})
+```
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("CSIRO_colours.R", note = "the CSIRO brand colours")
+```
+
+# Sample reconciliation — step 00 {#sec-audit}
+
+**Why.** The upstream pipeline was run incrementally, and the artefact
+directories (`contigs/`, `blast/`, `lca/`, `mapping/`, reads) disagreed about
+which samples exist. Two samples even had different file names in different
+directories. Step 00 builds the single authoritative inventory that every
+later step reads, so nothing downstream has to guess.
+
+::: {.decision}
+**File-name aliases are resolved in a table, not by renaming files.**
+`metadata/sample_aliases.tsv` maps `8334-AMLoculosum-BriddledTurn7` →
+`8334-AMLoculosum-BriddledTurn` and `B6852_F1_38_1` → `B6852_F1_38_S1`.
+The raw data stay untouched and the mapping is visible.
+:::
+
+::: {.decision}
+**Every exclusion has a diagnosed reason** (`results/audit/excluded_samples.tsv`).
+A sample is never silently missing from a figure.
+:::
+
+::: {.decision}
+**Samples removed by decision are listed in one file, and the raw data are
+untouched.** `metadata/excluded_samples.tsv` gives each removed sample and why.
+Step 00 gives them the status `excluded_manual`, which every later step
+honours. Step 21, which reads the assemblies directly, skips them as well. To
+restore a sample, delete its row and re-run.
+:::
+
+```{r}
+#| label: manual-exclusions
+#| code-summary: "Samples removed from every analysis, and why"
+tbl(merge(excl, meta[, .(sample_id, recorded_as = tick_species, host_species)],
+          by = "sample_id", all.x = TRUE)[, .(sample_id, recorded_as, host_species, reason)],
+    "Samples removed from every analysis (metadata/excluded_samples.tsv)")
+```
+
+```{r}
+#| label: audit
+#| code-summary: "Audit status counts and the excluded samples"
+tbl(audit[, .N, by = status][order(-N)], "Samples by pipeline status")
+tbl(rtsv("results", "audit", "excluded_samples.tsv"), "Excluded samples and why")
+```
+
+The *needs_lca* and *needs_mapping* queues that this audit wrote have since been
+processed by steps 01–02 (@sec-backfill). That is why `r n_mat` samples now
+reach the matrix.
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/00_audit_samples.py")
+show_code("metadata/excluded_samples.tsv", note = "samples removed by decision")
+show_code("code/analysis/common.py", note = "shared Python helpers: config, aliases, paths")
+```
+
+# Cluster backfills — steps 01, 02 and the streaming LCA {#sec-backfill}
+
+**Why.** 12 samples had BLAST output but no LCA, and 24 had an LCA but were
+never read-mapped.
+
+* **LCA never ran because the original `code/lca.py` loads the whole BLAST
+  table into memory.** Seven BLAST files are 10–150 GB, so it ran out of
+  memory. `lca_stream.py` streams the file one query at a time. Its peak
+  memory was measured at a flat 2.34 GB on the 149 GB file. The
+  classification logic is unchanged.
+* **NCBI has merged taxids since the local April 2026 taxonomy dump.**
+  `merged.dmp` from the current dump rescues them; before, they silently
+  became "unclassified". `make_merged_filtered.py` drops the ~2% of merge
+  targets newer than the local dump, which would otherwise crash taxopy.
+
+::: {.decision}
+**The taxonomy dump (`nodes.dmp`, `names.dmp`) was *not* updated.** The 120
+samples already classified were called against the April 2026 dump. Swapping
+it would make backfilled samples incomparable with them.
+:::
+
+::: {.decision}
+**The Slurm scripts are POSIX `sh`.** This cluster runs batch scripts with
+`/bin/sh` whatever the shebang, so bash-only syntax fails at submit time. Queue
+files hold paths relative to the project root, so they work under either mount
+point.
+:::
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/lca_stream.py", note = "constant-memory LCA")
+show_code("code/analysis/make_merged_filtered.py")
+show_code("code/analysis/01_backfill_lca.sh")
+show_code("code/analysis/02_backfill_mapping.sh")
+show_code("code/analysis/submit_backfills.sh")
+```
+
+# Taxonomy and scope — step 03 {#sec-taxonomy}
+
+**What.** Every LCA taxid gets a full lineage and is put into one of five
+**scopes**:
+
+| scope | rule | meaning |
+|---|---|---|
+| `host` | phylum Arthropoda | the tick itself |
+| `bloodmeal` | phylum Chordata | vertebrate DNA from the blood meal |
+| `microbial` | Bacteria, Archaea, Viruses, and Eukaryota *outside* Metazoa/Viridiplantae | the analysis target |
+| `other_eukaryote` | other Metazoa / plants | e.g. nematodes, pollen |
+| `ambiguous` | LCA above domain (`root`, `cellular organisms`) | genuinely unresolvable, not forced into a class |
+
+::: {.decision}
+**The scope rules were checked against the local taxonomy, not assumed.** NCBI's
+current bacterial "kingdom" is a clade name (Pseudomonadati, Bacillati) and
+cannot be used. Microbial eukaryotes such as *Babesia* have no kingdom at all.
+The rule "Eukaryota and not Metazoa/Viridiplantae" handles both cases
+correctly.
+:::
+
+::: {.decision}
+**Cross-kingdom homonyms are kept apart.** In NCBI, *Bacillus* is both a bacterium
+and a stick insect, and *Planococcus* is both a bacterium and a mealybug. Rows
+are filtered to microbial scope *before* labels are deduplicated, so a bacterial
+row can never inherit an insect lineage.
+:::
+
+```{r}
+#| label: taxonomy
+#| code-summary: "Scope classes and contaminant annotation"
+lin <- rtsv("results", "taxonomy", "taxon_lineage.tsv")
+tbl(lin[, .N, by = scope_class][order(-N)], "Distinct LCA taxa by scope")
+tbl(lin[contaminant_flag == 1, .N, by = .(genus, contaminant_confidence)][order(-N)][1:20],
+    "Reagent-contaminant genera flagged (first 20; annotation only)")
+tbl(rtsv("results", "taxonomy", "homonyms.tsv"), "Cross-kingdom homonyms")
+```
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/03_build_taxonomy.py")
+show_code("metadata/reagent_contaminants.tsv", note = "the contaminant list used for annotation")
+```
+
+# The abundance matrices — steps 04, 04b and verification {#sec-matrices}
+
+**This is the core join**, and the step the original project was missing. The
+Pavian kreports counted **contigs**, so one contig counted as one "read" and a
+300 bp contig at 2× scored the same as a 500 kb genome at 300×. Step 04 joins
+each contig's LCA call to its read mapping and weights taxonomy by TPM.
+
+Per sample:
+
+1. inner-join `lca/<s>.blast.lca` × `mapping/<s>.coverage.tsv` on contig id;
+2. apply the **contig evidence filter**: length ≥
+   `r params$contig_filter$min_contig_len` bp, ≥
+   `r params$contig_filter$min_mapped_reads` mapped reads, top bitscore ≥
+   `r params$contig_filter$min_top_bitscore`;
+3. renormalise TPM **within the microbial fraction** (`tpm_microbial`, summing
+   to 10⁶ per sample);
+4. aggregate to taxon and apply the presence thresholds;
+5. export species / genus / family / phylum matrices.
+
+::: {.decision}
+**Short contigs are filtered *before* renormalising.** TPM divides by length,
+so short, thinly covered contigs grab a disproportionate share. On sample
+0143-F1-Am-sp, LCA-assigned contigs hold 95.4% of mapped *reads* but only
+60.3% of *TPM*. Filtering first stops that assembly noise from setting the
+denominator.
+:::
+
+## Where the sequence goes
+
+```{r}
+#| label: fractions
+#| code-summary: "Per-sample fraction summary"
+fr <- frac[, .(sample_id, contigs_total, contigs_passing_filter, reads_mapped_total,
+               no_lca = tpm_pct_no_lca, filtered_out = tpm_pct_filtered_out,
+               host = tpm_pct_host, bloodmeal = tpm_pct_bloodmeal,
+               microbial = tpm_pct_microbial, ambiguous = tpm_pct_ambiguous)]
+tbl(fr[, lapply(.SD, median), .SDcols = -1][, stat := "median across samples"],
+    "Median % of each sample's TPM by fraction")
+tbl(fr, "Per-sample fractions (% of TPM)")
+```
+
+```{r}
+#| fig-cap: "Figure 01 — the TPM fraction per sample, ordered by microbial share. The grey bulk is contigs with no BLAST hit (caveat 1)."
+fig("01_sequence_fractions.png")
+```
+
+```{r}
+#| fig-cap: "Figure 01b — the same samples with no-hit contigs removed and the rest renormalised: where *identifiable* sequence goes."
+fig("01b_sequence_fractions_assigned.png")
+```
+
+```{r}
+#| fig-cap: "Figure 01c — also dropping contigs that failed the evidence filter: what actually reaches the analysis."
+fig("01c_sequence_fractions_retained.png")
+```
+
+**How to read it.** The host share (`host`) badly *under*-states how much of
+each library is tick, because tick DNA mostly gets no BLAST hit and lands in
+`no_lca`. That is why the analysis renormalises within microbes and never uses
+the host or no-hit share as a denominator.
+
+## Does the evidence filter change the answer? (step 04b)
+
+::: {.decision}
+**The filter is a judgement call, so its effect is shown rather than asserted.**
+The join is re-run under *lenient* / *default* / *strict* profiles.
+:::
+
+```{r}
+#| label: sensitivity
+#| code-summary: "Filter-sensitivity tables"
+tbl(rtsv("results", "tables", "filter_sensitivity_fractions.tsv"),
+    "Mean TPM shares under each filter profile")
+fs <- rtsv("results", "tables", "filter_sensitivity_genera.tsv")
+tbl(fs, "Top genera under each profile")
+```
+
+The dominant genera are robust to the choice. *Rickettsia* and *Francisella*
+**grow** as the filter tightens, which is what real, deeply covered genomes do.
+Taxa that vanish under *strict* (e.g. *Klebsiella*, *Iltovirus*) rest on thin
+assemblies and deserve suspicion.
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/04_build_matrices.py", note = "the core join")
+show_code("code/analysis/04b_filter_sensitivity.py")
+show_code("code/analysis/verify.py", note = "assertions over the matrices")
+```
+
+# Sample metadata — steps 05, 05b and 06 {#sec-metadata}
+
+**The curated source of truth is `metadata/barker_microbe_analysis_metadata.csv`**:
+tick genus and species, life stage, number of ticks pooled, host type and
+species, location, and GPS. The pipeline never edits it.
+
+* **Step 05** builds a template with every field the pipeline can derive on its
+  own. These are the sequencing run fields (flowcell, lane, index, which of two
+  sequencing *submissions*) and *guesses* of species and stage parsed from the
+  sample-id string.
+* **Step 05b** joins the curated CSV to those derived fields and writes
+  `metadata/sample_metadata.tsv`, which every later step reads.
+* **Step 06** validates the result and stops the pipeline on errors that would
+  otherwise become silent NAs.
+
+::: {.decision}
+**Step 05b fixes formatting only. It never changes content, and logs every
+change.** Trailing spaces were stripped (`"fecialis "` → `"fecialis"`), and two
+samples with `"lat, lon"` pasted into the latitude cell were split.
+Biologically doubtful records are *flagged* for review in
+`results/audit/metadata_import_issues.tsv`, never rewritten. The tick species
+is written as a binomial (`Ixodes tasmani`). `species_identified = no` marks
+`sp.` records, which count toward their genus but never toward a species-level
+test.
+:::
+
+::: {.decision}
+**The sequencing submission is kept as a covariate.** With no controls,
+flowcell, lane and submission are the only handles on technical variation. They
+are tested alongside the biology (sections 11 and 13).
+:::
+
+## Identifications corrected in this version
+
+```{r}
+#| label: id-corrections
+#| code-summary: "Tick identifications changed since the previous run"
+tbl(id_fix[order(sample_id)], "Curated tick species: previous run vs this run, with the curator's note")
+```
+
+`r nrow(id_fix[sample_id %in% excl$sample_id])` of these samples were also
+removed (@sec-audit). Their corrected identifications are kept in the
+metadata for the record.
+
+## Records flagged for review
+
+```{r}
+#| label: meta-issues
+#| code-summary: "Import issues"
+iss <- rtsv("results", "audit", "metadata_import_issues.tsv")
+tbl(iss[order(match(level, c("error", "review", "fixed", "info")))],
+    "Everything step 05b changed or flagged")
+```
+
+::: {.callout-warning}
+## Please check these against the source records
+`r nrow(iss[level == "review"])` records are marked **review**. The mitogenome
+cross-check in @sec-mito-check gives independent molecular evidence for or
+against the species-level ones.
+:::
+
+```{r}
+#| label: validation
+#| code-summary: "Step 06 validation report"
+#| comment: ""
+cat(readLines(R("results", "audit", "metadata_validation.txt")), sep = "\n")
+```
+
+## What was sampled
+
+```{r}
+#| label: meta-overview
+#| code-summary: "Cross-tabulations of the curated metadata (analysed samples)"
+am <- meta[sample_id %in% mat_ids]
+tbl(dcast(am[, .N, by = .(tick_genus, host_type)], tick_genus ~ host_type,
+          value.var = "N", fill = 0), "Analysed samples: tick genus × host type")
+tbl(am[, .N, by = .(tick_genus, tick_species)][order(tick_genus, -N)],
+    "Analysed samples per tick species")
+tbl(am[, .N, by = life_stage][order(-N)], "Life stage")
+tbl(meta[, .(sample_id, status, tick_species, life_stage, n_ticks_pooled, host_type,
+             host_species, collection_site, latitude, longitude, seq_submission)],
+    "The full curated metadata as the pipeline sees it")
+```
+
+::: {.callout-note}
+## Tick genus and host type are confounded
+*Amblyomma* in this collection is mostly from reptiles, while *Ixodes* and
+*Haemaphysalis* are almost all from mammals. A naïve "host type" difference is
+therefore largely a tick-genus difference. Section 13 tests host type
+**within** tick genus for this reason.
+:::
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/05_make_metadata_template.py")
+show_code("code/analysis/05b_import_metadata.py", note = "curated CSV → sample_metadata.tsv")
+show_code("code/analysis/06_validate_metadata.R")
+```
+
+# The TreeSummarizedExperiment — step 07 {#sec-tse}
+
+Assays, row data (taxonomy) and column data (metadata + per-sample QC) are
+assembled into one Bioconductor `TreeSummarizedExperiment` per rank, at
+`results/tse/`.
+
+| assay | role |
+|---|---|
+| `tpm_microbial` | **the** abundance; sums to 10⁶ per sample |
+| `reads` | evidence only: gates presence calls |
+| `n_contigs` | evidence only |
+
+::: {.decision}
+**Higher ranks are agglomerated in R from the species object, then
+cross-checked against the Python matrices.** Per-sample totals agree to within
+0.0000 TPM at every rank, so there is one source of truth with two independent
+implementations.
+:::
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/07_build_tse.R")
+show_code("code/analysis/common.R", note = "shared R helpers, the caveat text, the tick-genus palette")
+```
+
+# Composition — step 08 {#sec-composition}
+
+```{r}
+#| fig-cap: "Figure 02 — the 9 most abundant microbial genera per sample (the rest as 'other'), grouped by curated tick species. Each bar is one tick."
+fig("02_top_genera_by_species.png")
+```
+
+```{r}
+#| fig-cap: "Figure 03 — prevalence against mean abundance per genus. Orange triangles = on the reagent-contaminant list (annotated, not removed)."
+fig("03_prevalence_vs_abundance.png")
+```
+
+::: {.decision}
+**Nine named genera per stacked bar, not twenty.** Nine is the most the
+CSIRO palette can carry while every colour stays distinguishable under
+colour-vision deficiency (@sec-colours). The full top-20 view is the heatmap
+(figure 04) and figure 11, where the value is written in the cell.
+:::
+
+**How to read figure 03.** Without blanks, this is the main contamination
+diagnostic available. Reagent contaminants tend to be *highly prevalent at low
+abundance*, while genuine tick symbionts sit at high abundance in the ticks that
+carry them.
+
+```{r}
+#| fig-cap: "Figure 04 — log10(TPM+1) heatmap of the 20 most abundant genera; columns annotated by tick genus, rows by reagent-contaminant flag."
+fig("04_genus_heatmap.png")
+```
+
+## Cross-check against an independent classifier
+
+```{r}
+#| label: bracken
+#| code-summary: "Concordance with read-level Kraken2/Bracken"
+bc <- rtsv("results", "tables", "lca_vs_bracken_concordance.tsv")
+```
+
+The assembly → BLAST → LCA track and read-level Kraken2/Bracken share no
+inputs beyond the reads. Across `r sum(!is.na(bc$spearman_rho))` samples, the
+median per-sample Spearman correlation of genus abundances is
+**ρ = `r round(median(bc$spearman_rho, na.rm = TRUE), 2)`**. This is moderate:
+the two measure different things (assembled contigs vs raw reads) and disagree
+most where assembly is poor. Low-abundance calls should be treated cautiously.
+
+```{r}
+#| fig-cap: "Figure 05 — per-sample concordance between the LCA and Bracken genus profiles."
+fig("05_lca_vs_bracken.png")
+```
+
+::: {.callout-note}
+## The decontam frequency test was not run
+`decontam`'s frequency method needs per-sample DNA concentrations, not blanks.
+It is the one contamination test this design could support. No
+`dna_conc_ng_ul` column exists in the metadata, so it was skipped. **Supplying
+DNA concentrations is the single most useful addition to the metadata.**
+:::
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/08_composition.R")
+```
+
+# Diversity, and how much is batch — step 09 {#sec-diversity}
+
+```{r}
+#| fig-cap: "Figure 06 — observed richness rises with assembly depth. Richness differences are partly technical."
+fig("06_richness_vs_depth.png")
+```
+
+```{r}
+#| label: alpha
+#| code-summary: "Depth confound"
+al <- rtsv("results", "tables", "alpha_diversity.tsv")
+rho_depth <- cor(al$observed, al$contigs_passing, method = "spearman", use = "complete")
+```
+
+Spearman ρ between observed genera and contigs passing the filter is
+**`r round(rho_depth, 2)`**, so richness is depth-confounded. Do not interpret
+raw richness differences as biology.
+
+```{r}
+#| fig-cap: "Figure 07 — alpha diversity by curated tick species; points coloured by tick genus."
+fig("07_alpha_by_species.png")
+```
+
+```{r}
+#| layout-ncol: 2
+#| fig-cap:
+#|   - "Figure 08 — PCoA, Bray–Curtis, by tick species: one panel per tick genus (all other ticks in grey), species named at their centroid"
+#|   - "Figure 08 — the same, Aitchison (CLR)"
+fig("08_pcoa_bray_species.png"); fig("08_pcoa_aitchison_species.png")
+```
+
+```{r}
+#| layout-ncol: 2
+#| fig-cap:
+#|   - "Figure 09 — the same Bray–Curtis ordination by sequencing submission (colour and shape)"
+#|   - "Figure 09 — Aitchison, by sequencing submission"
+fig("09_pcoa_bray_batch.png"); fig("09_pcoa_aitchison_batch.png")
+```
+
+::: {.decision}
+**Species are shown one genus at a time.** About thirty species cannot share
+one colour scale and stay distinguishable. In figure 08 each panel is a tick
+genus, its species are coloured within the panel and named on the plot, and
+every other tick is drawn in grey for context.
+:::
+
+**Two distances, on purpose.** Bray–Curtis is driven by the dominant taxa.
+Aitchison (Euclidean distance on centred log-ratios) treats the data as
+compositional and weighs rare taxa more. A result that holds under both does not
+depend on that choice.
+
+```{r}
+#| label: permanova-marginal
+#| code-summary: "Single-term PERMANOVA, biology and batch in one table"
+pm <- rtsv("results", "tables", "permanova.tsv")
+tbl(pm, "PERMANOVA, each term tested alone (step 09)")
+```
+
+**How to read it.** R² is the share of between-sample variation the term
+accounts for. Technical terms (`TECHNICAL`) are reported beside the biological
+ones and *not* adjusted away. With no controls, a significant batch effect is
+a finding, not a nuisance. These are single-term tests on all samples. The
+tests in section 13 are better controlled.
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/09_diversity.R")
+```
+
+# Pathogen and endosymbiont targets — step 10 {#sec-targets}
+
+A fixed list of `r nrow(fread(R("metadata", "target_taxa.tsv"), skip = "taxon\t"))` target taxa
+(`metadata/target_taxa.tsv`) is mapped onto every sample. Each target is
+categorised as *pathogen*, *endosymbiont*, *both*, or *uncertain*. Presence
+is called on read and contig evidence, with a blunt evidence tier
+(low / moderate / high) so a marginal call is never read as a firm one.
+
+```{r}
+#| label: targets
+#| code-summary: "Target summary"
+tbl(tsum[n_samples_present > 0, .(target, category, n_samples_present, prevalence_pct,
+                                  median_tpm_when_present, longest_contig)],
+    "Targets with at least one presence call")
+```
+
+::: {.callout-warning}
+## A genus-level hit in *Rickettsia*, *Francisella* or *Coxiella* does not establish pathogen presence
+Each genus contains obligate tick endosymbionts **and** real pathogens
+(spotted-fever-group rickettsiae, *F. tularensis*, *C. burnetii*). These are
+near-identical over short contigs. Sections 15–16 resolve them with marker
+genes. The same caution applies to *Borrelia* in Australia.
+:::
+
+The megabase-scale *Rickettsia*, *Francisella* and *Coxiella* contigs mean
+near-complete genomes were recovered from the ticks that carry them.
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/10_export_targets.py")
+show_code("metadata/target_taxa.tsv")
+```
+
+# Tick genus and species comparison — step 10b {#sec-tickgroups}
+
+This section uses the curated metadata to ask four questions:
+
+1. **Does microbial composition differ between tick genera, and between species
+   within a genus?**
+2. **Is any apparent host effect real once tick genus is accounted for?**
+3. **Which endosymbionts does each tick lineage carry, and how dominant are
+   they?** These maternally inherited symbionts are this study's keystone taxa.
+4. **Does composition track geography?**
+
+```{r}
+#| label: tg-load
+#| code-summary: "Load all step-10b tables"
+TG <- function(f) rtsv("results", "tables", "tick_groups", f)
+perm  <- TG("permanova.tsv");            pw   <- TG("permanova_pairwise_genus.tsv")
+pg    <- TG("endosymbiont_prevalence_by_genus.tsv")
+ps    <- TG("endosymbiont_prevalence_by_species.tsv")
+fish  <- TG("endosymbiont_fisher_tests.tsv"); kw <- TG("endosymbiont_abundance_kruskal.tsv")
+dom   <- TG("dominant_genus_per_sample.tsv"); co <- TG("endosymbiont_cooccurrence.tsv")
+ind   <- TG("indicator_genera_by_tick_genus.tsv"); mant <- TG("mantel_composition_vs_geography.tsv")
+MIN_N <- params$tick_groups$min_samples_per_group
+# One PERMANOVA row by test name and distance. The arguments are deliberately
+# NOT called `test`/`distance`: inside data.table's [ ] those names would
+# resolve to the columns themselves and silently match every row.
+P <- function(which_test, which_dist = "bray") {
+  x <- perm[perm$test == which_test & perm$distance == which_dist]
+  stopifnot(nrow(x) == 1)
+  x
+}
+# p-values as plain text (knitr would otherwise render 7.8e-05 as 7.8^{-5})
+fp <- function(p) ifelse(p < 0.001, format(signif(p, 2), scientific = TRUE), sprintf("%.3f", p))
+```
+
+::: {.decision}
+**Groups with fewer than `r MIN_N` samples are drawn but never tested.**
+Single ticks are shown so nothing is hidden. A "species mean" of one tick is
+an individual, not a species.
+:::
+
+::: {.decision}
+**PERMDISP is reported beside every single-factor PERMANOVA.** PERMANOVA
+responds to differences in *spread* as well as *location*. A significant
+PERMANOVA together with a significant PERMDISP means part of the "difference"
+is that one group is more variable.
+:::
+
+::: {.decision}
+**Host type is tested *within* tick genus.** Permutations are restricted to
+within-genus blocks, so the test only uses host contrasts that occur inside a
+genus (e.g. *Amblyomma* on reptiles vs mammals). A marginal model,
+`~ genus + host + submission` with `by = "margin"`, gives each term's share
+*after* the others.
+:::
+
+## Who was sampled
+
+```{r}
+#| fig-cap: "Figure 10 — analysed samples per tick species (left; dotted line = minimum group size for testing) and the tick genus × host type cross-tabulation (right) that makes host and genus hard to separate."
+fig("10_samples_by_tick_and_host.png")
+```
+
+## Mean composition by tick genus and species
+
+```{r}
+#| fig-cap: "Figure 11a — mean % of microbial TPM for the 20 most abundant microbial genera, per tick genus. Cells show values ≥ 1%."
+fig("11a_composition_by_tick_genus.png")
+```
+
+```{r}
+#| fig-cap: "Figure 11b — the same per tick species, grouped by genus. Columns with n < 3 are individual ticks."
+fig("11b_composition_by_tick_species.png")
+```
+
+```{r}
+#| fig-cap: "Figure 11c — as Figure 11a, for the 50 most abundant microbial genera."
+fig("11c_composition_by_tick_genus_top50.png")
+```
+
+```{r}
+#| fig-cap: "Figure 11d — as Figure 11b, for the 50 most abundant microbial genera. Columns with n < 3 are individual ticks."
+fig("11d_composition_by_tick_species_top50.png")
+```
+
+::: {.decision}
+**Heatmaps, not 20-colour stacked bars.** Twenty categorical colours cannot be
+told apart reliably, especially under colour-vision deficiency. A heatmap on the
+single-hue CSIRO blue ramp, with the value written in the cell, shows the same
+information without relying on colour identity.
+:::
+
+```{r}
+#| label: comp-tables
+#| code-summary: "Group means as tables"
+tbl(TG("mean_composition_by_genus.tsv")[mean_pct >= 1][order(genus, -mean_pct)],
+    "Microbial genera averaging ≥ 1% within a tick genus")
+```
+
+## Do tick genera and species differ in composition?
+
+```{r}
+#| layout-ncol: 2
+#| fig-cap:
+#|   - "Figure 12 — PCoA (Bray–Curtis). Colour = tick genus (also labelled directly), ellipses = 68% for genera with n ≥ 3."
+#|   - "Figure 12 — the same, Aitchison distance."
+fig("12_pcoa_bray_tick_genus.png"); fig("12_pcoa_aitchison_tick_genus.png")
+```
+
+```{r}
+#| label: permanova-groups
+#| code-summary: "All step-10b PERMANOVA tests"
+tbl(perm[, .(test, distance, term, n, levels, R2, F, p, dispersion_p, note)],
+    "PERMANOVA (999 permutations). dispersion_p = PERMDISP for the same grouping.", page = 40)
+```
+
+```{r}
+#| label: permanova-text
+#| echo: false
+g_b  <- P("tick genus", "bray");      g_a  <- P("tick genus", "aitchison")
+sg_b <- P("tick species | genus", "bray"); sg_a <- P("tick species | genus", "aitchison")
+h_b  <- P("host type", "bray");       hg_b <- P("host type | genus", "bray")
+hg_a <- P("host type | genus", "aitchison")
+mm_b <- perm[test == "marginal model" & distance == "bray"]
+f3 <- function(x) formatC(x, format = "f", digits = 3)
+f2 <- function(x) formatC(x, format = "f", digits = 2)
+```
+
+**What the tests say** (Bray–Curtis; Aitchison in brackets):
+
+* **Tick genus**: R² = `r f2(g_b$R2)`, *p* = `r f3(g_b$p)`
+  [R² = `r f2(g_a$R2)`, *p* = `r f3(g_a$p)`]; PERMDISP *p* =
+  `r f3(g_b$dispersion_p)`.
+* **Species within genus** (species fitted after genus, permutations within
+  genus): R² = `r f2(sg_b$R2)`, *p* = `r f3(sg_b$p)`
+  [R² = `r f2(sg_a$R2)`, *p* = `r f3(sg_a$p)`].
+* **Host type, ignoring genus**: R² = `r f2(h_b$R2)`, *p* = `r f3(h_b$p)`.
+  **Host type within genus**: R² = `r f2(hg_b$R2)`, *p* = `r f3(hg_b$p)`
+  [*p* = `r f3(hg_a$p)`].
+* **Marginal model** (each term after the others):
+  `r paste(sprintf("%s R² = %s, p = %s", mm_b$term, f2(mm_b$R2), f3(mm_b$p)), collapse = "; ")`.
+
+::: {.callout-tip}
+## What this means
+* **Tick genus is the strongest structure in the data.** It explains about
+  `r round(100 * g_b$R2)`% of between-tick variation (Bray–Curtis), far more
+  than host type or sequencing batch. PERMDISP is also significant, so genera
+  differ in how *variable* their microbiomes are as well as in what they
+  contain. *Haemaphysalis* in particular forms a tight, distinct cluster
+  (figure 12).
+* **Species matter beyond genus**, but less. That holds clearly under
+  Bray–Curtis, which is driven by the dominant symbionts. Under Aitchison, which
+  up-weights rare taxa, it is borderline. Species differences are therefore
+  mostly about *which dominant symbiont* a tick carries.
+* **Host type is a small effect once tick genus is accounted for.** Its
+  within-genus R² is ~`r round(100 * hg_b$R2)`%, and in the marginal model it
+  is significant under Bray–Curtis but not under Aitchison. Most of the naïve
+  host-type signal is the genus × host confound.
+* **Sequencing submission is a small but real batch effect** in both
+  distances (marginal R² ≈ `r round(100 * mm_b[term == "seq_submission"]$R2)`%).
+  Report it; do not adjust it away.
+* **Life stage has no detectable effect** within genus.
+:::
+
+```{r}
+#| label: pairwise
+#| code-summary: "Pairwise genus PERMANOVA"
+tbl(pw[order(distance, p_adj_BH)], "Pairwise PERMANOVA between tick genera (BH-adjusted within distance)")
+```
+
+## Endosymbionts: the keystone symbionts of each tick lineage
+
+::: {.decision}
+**"Keystone" here means the dominant, maternally inherited symbionts.** These are
+the taxa that define a tick lineage's microbiome. Keystone taxa were *not*
+inferred from co-occurrence-network centrality. With 3–56 samples per genus,
+compositional abundances and no controls, network inference is unreliable. The
+same questions are answered directly instead: which symbiont each lineage
+carries (prevalence), how dominant it is (abundance when present, dominant genus
+per tick), and which symbionts exclude or accompany each other (co-occurrence).
+:::
+
+::: {.decision}
+**Presence uses the step-10 call (reads + contigs), never TPM alone.**
+*Rickettsia*, *Francisella* and *Coxiella* are genus-level calls, marked `*` in
+every figure.
+:::
+
+```{r}
+#| fig-cap: "Figure 13a — endosymbiont prevalence per tick genus; cells give ticks with a presence call / ticks analysed."
+fig("13a_endosymbiont_prevalence_by_genus.png")
+```
+
+```{r}
+#| fig-cap: "Figure 13b — endosymbiont prevalence per tick species."
+fig("13b_endosymbiont_prevalence_by_species.png")
+```
+
+```{r}
+#| label: prev-tables
+#| code-summary: "Prevalence with 95% Wilson intervals"
+tbl(pg[n_present > 0][order(target, -prevalence_pct)],
+    "Endosymbiont prevalence by tick genus (Wilson 95% CI)", page = 15)
+tbl(ps[n_present > 0][order(target, genus, -prevalence_pct)],
+    "Endosymbiont prevalence by tick species")
+```
+
+```{r}
+#| label: fisher
+#| code-summary: "Fisher's exact tests on presence/absence"
+tbl(fish, "Endosymbiont presence vs tick genus / species / host type (BH-adjusted across all tests)")
+```
+
+**How to read the Fisher table.** "tick genus" asks whether prevalence differs
+across the genera with n ≥ `r MIN_N`. "species within X" asks the same among
+the species of one genus. "host type within X" asks whether, inside one tick
+genus, ticks from different host types differ. That separates a host effect
+from a tick effect. Tables larger than 2×2 use Monte-Carlo *p*-values
+(`r format(params$tick_groups$fisher_B, big.mark = ",")` replicates).
+
+```{r}
+#| fig-cap: "Figure 14 — how dominant each endosymbiont is in the ticks that carry it (% of microbial TPM, log scale; shape = host type)."
+fig("14_endosymbiont_abundance_by_genus.png")
+```
+
+```{r}
+#| label: kw
+#| code-summary: "Kruskal–Wallis: endosymbiont abundance across tick genera"
+tbl(kw, "Kruskal–Wallis test of endosymbiont relative abundance across tick genera (all ticks, zeros included)")
+```
+
+```{r}
+#| label: endo-text
+#| echo: false
+pv <- function(g, t) { x <- pg[genus == g & target == t]
+  sprintf("%d/%d (%s)", x$n_present, x$n, pct(x$prevalence_pct, 0)) }
+cxf <- co[target_a == "Coxiella" & target_b == "Francisella"]
+```
+
+::: {.callout-tip}
+## What this means: each tick lineage has its own primary symbiont
+* ***Coxiella*** is the symbiont of *Bothriocroton*
+  (`r pv("Bothriocroton", "Coxiella")`) and the soft ticks: *Argas*
+  `r pv("Argas", "Coxiella")`, *Ornithodoros* `r pv("Ornithodoros", "Coxiella")`.
+  It is nearly absent from *Amblyomma* (`r pv("Amblyomma", "Coxiella")`) and
+  absent from *Haemaphysalis* (`r pv("Haemaphysalis", "Coxiella")`).
+* ***Francisella*** takes its place in *Amblyomma*
+  (`r pv("Amblyomma", "Francisella")`) and *Haemaphysalis*
+  (`r pv("Haemaphysalis", "Francisella")`).
+* **The two rarely share a tick.** They co-occur in only `r cxf$n_both` ticks,
+  odds ratio `r round(cxf$odds_ratio, 2)` (*p* = `r fp(cxf$p)`). This
+  matches the known replacement of *Coxiella*-like by *Francisella*-like
+  primary symbionts in ticks. Stratified by tick genus, the exclusion weakens
+  (*p* = `r fp(cxf$p_genus_stratified)`). It is therefore mostly a
+  *between-genus* partition, with little evidence yet of exclusion inside a
+  genus.
+* ***Arsenophonus*** is essentially an *Amblyomma* associate
+  (`r pv("Amblyomma", "Arsenophonus")`), and differs among *Amblyomma*
+  species.
+* ***Ixodes*** carries a mixed set: *Rickettsiella*
+  (`r pv("Ixodes", "Rickettsiella")`), *Rickettsia*
+  (`r pv("Ixodes", "Rickettsia")`), *Midichloria*
+  (`r pv("Ixodes", "Midichloria")`) and *Wolbachia*
+  (`r pv("Ixodes", "Wolbachia")`). *Wolbachia* in ticks usually comes from
+  parasitoid wasps.
+* ***Rickettsia*** is widespread across hard-tick genera. Its genus-level call
+  cannot separate endosymbiont from spotted-fever-group pathogen (@sec-trees).
+:::
+
+```{r}
+#| fig-cap: "Figure 15 — the single most abundant microbial genus in each tick, tallied per tick species."
+fig("15_dominant_genus_by_tick_species.png")
+```
+
+**How to read figure 15.** The dominant genus is often *not* a symbiont.
+Examples are the Jingmen-like flavivirus (`Flaviviridae (unresolved)`), which
+dominates `r dom[genus == "Haemaphysalis" & dominant == "Flaviviridae (unresolved)", .N]`
+of `r dom[genus == "Haemaphysalis", .N]` *Haemaphysalis*;
+`unresolved` bins; and genera on the reagent-contaminant list (e.g.
+*Elizabethkingia*, *Pseudomonas*, *Stenotrophomonas*). A contaminant topping a
+tick usually means that tick had little symbiont signal, so a small
+contaminating load ranks first after renormalising. Read those ticks as
+"no dominant symbiont detected", not as contaminant-driven microbiomes.
+
+```{r}
+#| label: dominant
+#| code-summary: "Dominant genus per tick genus"
+dsum <- dom[, .N, by = .(genus, dominant)][, share := N / sum(N), by = genus][order(genus, -N)]
+tbl(dsum[, .SD[1:min(3, .N)], by = genus], "Top three dominant microbial genera per tick genus")
+tbl(dom, "Dominant microbial genus in every tick")
+```
+
+## Do endosymbionts co-occur or exclude each other?
+
+::: {.decision}
+**Co-occurrence is tested twice**: across all ticks, and stratified by tick
+genus (exact Mantel–Haenszel). Two symbionts that simply favour the same tick
+genus look associated in the first test but not in the second. The stratified
+result is the one to interpret.
+:::
+
+```{r}
+#| label: cooc
+#| code-summary: "Pairwise co-occurrence"
+tbl(co, "Endosymbiont co-occurrence: odds ratio > 1 = found together more than expected")
+```
+
+## Indicator genera: what characterises each tick genus?
+
+Indicator-value analysis (IndVal.g, `indicspecies::multipatt`) scores each
+microbial genus on **specificity** (A: how concentrated its abundance is in one
+tick genus) and **fidelity** (B: how many ticks of that genus carry it).
+Candidate genera must pass the read threshold in ≥
+`r 100 * params$tick_groups$indicator_min_prevalence`% of ticks.
+
+```{r}
+#| label: indicators
+#| code-summary: "Indicator genera"
+if (is.null(ind)) cat("*indicspecies was not available when step 10b ran; re-run it once installed.*") else
+  tbl(ind[p_adj_BH < 0.05], "Significant indicator genera (BH q < 0.05); flagged_contaminant = on the reagent list")
+```
+
+## Does composition track geography?
+
+```{r}
+#| label: mantel
+#| code-summary: "Mantel tests: composition vs great-circle distance"
+tbl(mant, "Mantel test (Spearman) of microbial dissimilarity vs geographic distance (km)")
+```
+
+**How to read it.** Across all ticks, distance is confounded with tick genus and
+host, because different tick genera were collected in different regions. The
+**within-genus and within-species rows** ask the clean question: do two ticks of
+the same species have more similar microbiomes when they were collected closer
+together?
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/10b_tick_group_comparison.R", note = "every test in this section")
+```
+
+# Sampling maps — step 10c {#sec-maps}
+
+```{r}
+#| label: map-widget
+#| code-summary: "The interactive map (same object step 10c saved as results/maps/sampling_map.html)"
+#| fig-height: 7
+w <- R("results", "maps", "sampling_map_widget.rds")
+if (file.exists(w)) readRDS(w) else cat("*map not built yet*")
+```
+
+**Using the interactive map.**
+
+* Switch base layers (light / satellite / topographic) and toggle tick genera
+  in the panel at top right.
+* Hover for the sample id. Click for the full record: tick, life stage, host,
+  site, true coordinates, the dominant microbial genus, and which
+  endosymbionts and other targets were called.
+* Faded points were collected but never reached the abundance matrix.
+* Ticks sharing exact coordinates are fanned out by
+  `r params$maps$spread_deg`° so each can be clicked. The popup shows the true
+  location.
+
+The same map is also a standalone file, `results/maps/sampling_map.html`.
+
+```{r}
+#| fig-cap: "Figure 16a — all samples with coordinates. Colour = tick genus, shape = host type, size = ticks sharing a site, genus and host type."
+fig("16a_sampling_map.png")
+```
+
+```{r}
+#| fig-cap: "Figure 16b — one panel per tick genus; grey = every other sampled site."
+fig("16b_sampling_map_by_genus.png")
+```
+
+```{r}
+#| fig-cap: "Figure 16c — where each common endosymbiont was detected (filled) and where analysed ticks did not carry it (open grey)."
+fig("16c_endosymbiont_map.png")
+```
+
+::: {.decision}
+**Every sample with coordinates is mapped, including those never analysed**,
+because the map records the sampling, not the analysis. The `analysed` column
+in `results/maps/sampling_sites.tsv` and the faded points tell them apart.
+Samples outside the static map's extent (the Falklands *Ixodes uriae*) are
+named in the caption, and the interactive map shows them all.
+:::
+
+```{r}
+#| label: unmapped
+#| code-summary: "Samples that could not be mapped"
+tbl(meta[has_coords == "no", .(sample_id, tick_species, host_species, collection_site, status)],
+    "Samples with no coordinates (not on any map)")
+```
+
+```{r}
+#| results: asis
+#| echo: false
+show_code("code/analysis/10c_sampling_maps.R")
+```
+
+# Marker genes for the targets — steps 11–16 {#sec-markers}
+
+**Why.** Step 10 says a genus is present. For *Rickettsia*, *Coxiella* and
+*Francisella*, the question is *which species*: endosymbiont or pathogen.
+16S rRNA cannot answer that, so each target has its own panel of discriminating
+loci (`metadata/target_markers.tsv`). Examples: `gltA`, `ompA`, `ompB` and
+`sca4` for *Rickettsia*; `rpoB` and `icd` for *Coxiella*; `msp4` for
+*Anaplasma*; `cox1` and `cytb` for piroplasms.
+
+::: {.decision}
+**Every target contig is searched, not just confident detections.** A recovered
+marker gene is itself detection evidence. The step-10 call travels with each
+sequence as an annotation, so you can filter afterwards.
+:::
+
+::: {.decision}
+**Paralogues are resolved competitively.** *Rickettsia* `ompA`, `ompB` and
+`sca4` are all Sca-family autotransporters and cross-hit one another's probes.
+Without resolution, one stretch of contig would be exported three times under
+three gene names. The best single-probe bitscore claims the region, and the
+loser is kept in `marker_loci.tsv` as `paralog_suppressed`.
+:::
+
+::: {.decision}
+**Reading frames are recovered from the sequence, and internal stops are
+flagged, not fixed.** Sequences with stops go to `*.flagged.fna` and stay out
+of the alignments. Protein-coding loci are aligned as amino acids and
+back-translated, which gives a true codon alignment.
+:::
+
+::: {.decision}
+**Viral targets are probed with the viruses actually present, not the
+family type species.** The `Flaviviridae` signal is almost entirely a
+*segmented* Jingmen-like virus with no polyprotein. Classical flavivirus
+probes found nothing, while Jingmenvirus segment probes recovered VP1/VP2 at
+83% identity.
+:::
+
+```{r}
+#| label: markers
+#| code-summary: "Marker recovery"
+ms <- rtsv("results", "markers", "marker_summary.tsv")
+tbl(ms, "Recovered marker loci per target (step 16)")
+tbl(rtsv("results", "markers", "marker_gaps.tsv"), "Loci that produced nothing, and why")
+```
+
+```{r}
+#| results: asis
+#| echo: false
+for (f in c("11_fetch_marker_refs.py", "12_extract_target_contigs.py", "13_find_markers.py",
+            "14_extract_markers.py", "15_align_markers.py", "16_marker_report.py",
+            "markers_lib.py"))
+  show_code(file.path("code", "analysis", f))
+show_code("metadata/target_markers.tsv", note = "the marker panel")
+show_code("run_markers.sh")
+```
+
+# Marker-gene trees — steps 17–19b {#sec-trees}
+
+Steps 17–19 download named-species references for every recovered locus, cut
+the locus out of them, align them with the tick sequences, and build a FastTree
+per locus.
+
+::: {.decision}
+**References are chosen for breadth, not depth.** Candidates are screened on
+title before download, and the quota is spread round-robin across organisms
+(≤ `r params$trees$curate$max_per_organism` per organism). Otherwise forty
+copies of *R. felis* `gltA` would crowd out the species that give a tree its
+topology.
+:::
+
+::: {.decision}
+**Nothing is trusted until it is blasted.** Every downloaded record is
+searched with the locus probes, only the hit region is kept, and a reference
+whose locus carries an internal stop is dropped.
+:::
+
+::: {.decision}
+**Tip labels use the curated metadata.** The tick species stored inside a
+sample's sequence name was frozen when step 12 ran, often from the id-string
+guess. Step 19b now labels each figure from `metadata/sample_metadata.tsv`, so
+the trees show current identifications without re-running the BLAST steps.
+:::
+
+::: {.callout-warning}
+## These are screening trees
+FastTree with SH-like local support is fast and approximate. SH-like values
+are **not** bootstrap support. Many tick sequences are gene fragments: a
+300 bp `gltA` fragment inside a clade tells you the genus and the clade, not
+the species. Rebuild the loci that matter under a model-tested IQ-TREE
+analysis (step 25 shows the pattern).
+:::
+
+```{r}
+#| label: tree-summary
+#| code-summary: "Tree summary"
+ts <- rtsv("results", "markers", "trees", "tree_summary.tsv")
+tbl(ts[, .(target, marker, n_tips, n_samples, n_refs, n_organisms, aln_cols,
+           median_ungapped_nt, pct_gaps, tree_built, note)], "Every locus: tips, references, alignment")
+```
+
+```{r}
+#| label: tree-figures
+#| results: asis
+#| code-summary: "Every tree figure, grouped by target"
+pngs <- sort(list.files(R("results", "markers", "trees"), pattern = "\\.png$",
+                        recursive = TRUE, full.names = TRUE))
+pngs <- pngs[!grepl("/refs/|/hits/", pngs)]
+if (!length(pngs)) cat("*No tree figures yet: run `Rscript code/analysis/19b_tree_figures.R`.*\n")
+for (tg in unique(basename(dirname(pngs)))) {
+  cat(sprintf("\n## *%s* {.unnumbered}\n\n::: {.panel-tabset}\n\n", tg))
+  for (p in pngs[basename(dirname(pngs)) == tg]) {
+    cat(sprintf("### %s\n\n![](%s){width=100%%}\n\n",
+                sub(".*__", "", sub("\\.png$", "", basename(p))),
+                sub(paste0("^", ROOT), "..", p)))
+  }
+  cat(":::\n\n")
+}
+```
+
+```{r}
+#| results: asis
+#| echo: false
+for (f in c("17_fetch_tree_refs.py", "18_curate_tree_refs.py", "19_build_trees.py",
+            "19b_tree_figures.R", "trees_lib.py"))
+  show_code(file.path("code", "analysis", f))
+show_code("metadata/tree_references.tsv"); show_code("metadata/tree_ref_genomes.tsv")
+show_code("run_trees.sh")
+```
+
+# The ticks' own mitogenome phylogeny — steps 20–26 {#sec-mito}
+
+```{r}
+#| label: mito-refs-load
+#| code-summary: "Load the reference-mitogenome panel and step 20b's results"
+refpanel <- fread(R("metadata", "mito_ref_genomes.tsv"), skip = "accession", na.strings = c("", "NA"))
+refsum   <- rtsv("results", "mito", "ref_genomes", "ref_genome_summary.tsv")
+n_ref_ok <- sum(refsum$status == "ok")
+n_raw    <- length(grep("\\S", readLines(R("results", "mito", "mito_ref_seqs.txt")), value = TRUE))
+psum     <- rtsv("results", "mito", "concat", "mito_partition_summary.tsv")
+n_concat <- length(grep("^>", readLines(R("results", "mito", "concat", "mito_concat.fasta"))))
+```
+
+An independent workflow builds a phylogeny of the **ticks themselves** from
+their mitochondrial genomes:
+
+1. take one mitogenome contig per sample, chosen by homology;
+2. download **`r n_ref_ok` published tick mitogenomes** of named species
+   (step 20b) and annotate them the same way;
+3. annotate the 13 protein-coding genes;
+4. align each gene separately, codon-aware, samples and references together;
+5. infer one partitioned maximum-likelihood tree in IQ-TREE, with ModelFinder
+   choosing a model per gene and 1000 ultrafast bootstrap and SH-aLRT
+   replicates, rooted on the Argasidae references.
+
+
+## The samples' mitogenomes — steps 21–22 {#sec-mito-samples}
+
+::: {.decision}
+**Homology search is protein-level and order-wide.** Hard and soft ticks
+diverged more than 200 Mya, and nucleotide BLAST misses genes at that distance.
+tblastn on the conserved proteins finds them. A COX1 hit at 41.5% identity
+with *E* = 5×10⁻¹⁰⁷ is real. The identity floor was lowered and the *E*-value
+does the gating.
+:::
+
+::: {.decision}
+**The invertebrate mitochondrial genetic code (NCBI table 5) is used
+throughout.** Under the standard code, every in-frame TGA (Trp here) reads as
+a stop, and most real genes would be flagged as broken.
+:::
+
+::: {.decision}
+**No cross-gene "paralogue" resolution for mitogenomes.** Porting it from the
+marker workflow silently deleted a correct ND1 call in 87 of 149 samples,
+because ND1's approximate boundary overlapped its neighbour rrnL by a few base
+pairs. Mitochondrial genes are single-copy, so there is nothing to resolve.
+:::
+
+::: {.decision}
+**MITOS2 is installed but not used.** Its reference data is hosted only on
+Zenodo, which this compute node cannot reach. Annotation uses the homology
+fallback, which gives no tRNAs, gene order or exact start/stop codons. The
+code switches to MITOS2 automatically if `mito.annotate.mitos_refdata_dir` is
+set.
+:::
+
+```{r}
+#| label: mito-selection
+#| code-summary: "Mitogenome recovery per sample"
+sel <- rtsv("results", "mito", "mito_selection.tsv")
+tbl(sel[, .N, by = status], "Mitogenome candidate outcome")
+tbl(sel[, .(sample_id, status, n_candidate_contigs, contig_len, n_genes_found, genes_found)],
+    "Per-sample mitogenome recovery")
+```
+
+## Published reference mitogenomes — step 20b {#sec-mito-refs}
+
+Without references, the tree could only say which samples resemble each other.
+With them, every sample sits among species of known identity, and the tree
+has a defensible root. The raw list supplied
+(`results/mito/mito_ref_seqs.txt`, `r n_raw` lines) was curated into
+`metadata/mito_ref_genomes.tsv`: one row per distinct accession, every listed
+line accounted for, and a reason for anything not used. `r n_ref_ok`
+mitogenomes were downloaded, passed the identity check and were annotated.
+
+::: {.callout-important}
+## Errors found in the supplied list
+* **`NC_028521`, listed as *Dermacentor nuttalli*, is a frog** (*Rana
+  huanrensis*). It was replaced with `NC_028528`, the *D. nuttalli* RefSeq
+  mitogenome (a one-digit typo).
+* **`MT371800`, listed as *D. taiwanensis*, is *D. bellulus* in GenBank.**
+  It is used and labelled as listed. Please confirm which name is intended.
+* Truncated or garbled accessions were resolved to the only matching record
+  (table below). `KY45753` (*R. evertsi*) matches two clones from one study;
+  `KY457537` was used.
+* Three RefSeq copies duplicated GenBank records already in the list and were
+  dropped, as were ~15 accessions listed twice.
+* Two entries are SRA read runs, not genomes (`SRR4301110` *A. aureolatum*,
+  `SRR8074777` *A.* aff. *moreliae*). They are not used. Each would need its
+  mitogenome assembled from reads first.
+:::
+
+```{r}
+#| label: mito-refs-curation
+#| code-summary: "Every panel row that was corrected, dropped or needs a check"
+tbl(refpanel[!is.na(note) & note != "", .(accession, use, species, listed_as, note)],
+    "Reference list: corrections, exclusions and notes", page = 40)
+```
+
+::: {.decision}
+**Every reference is checked against its GenBank title before use.** Step 20b
+refuses a record whose title lacks the expected species epithet. That check
+catches errors like the frog automatically.
+:::
+
+::: {.decision}
+**References are annotated like the samples, not from GenBank features.** The
+same tblastn/blastn search, locus merging, reading-frame and stop-trim code
+(step 21's functions, `frame_mito_pcg`) runs on every reference. Many listed
+records (the Kelava et al. `MT3718xx` series) are GenBank "UNVERIFIED"
+sequences with no gene features. Identical gene-boundary rules also keep the
+codon alignments free of an artificial references-versus-samples edge
+pattern. A reference gene with internal stops is left out, not flagged: in a
+published complete genome it means a mis-called locus.
+:::
+
+::: {.decision}
+**The tree is rooted on the Argasidae references only.** The split between
+soft ticks (Argasidae) and hard ticks (Ixodidae) is the deepest
+well-established node among living ticks. Only *reference* tips define the
+outgroup, so a mislabelled sample cannot move the root. *Nuttalliella
+namaqua* is deliberately left out of the outgroup, because its position
+relative to the two families is the contested question.
+:::
+
+```{r}
+#| label: mito-refs-genes
+#| code-summary: "Gene recovery in the references and in the final matrix"
+tbl(refsum[status == "ok", .(accession, family, species, length, n_pcg, genes_annotated, flagged_genes)],
+    "Reference mitogenomes used: protein-coding genes recovered by the homology method")
+tbl(psum, "The supermatrix: one partition per protein-coding gene, samples and references")
+```
+
+The references expose a limit of the method. On complete published genomes,
+homology search recovers **ATP8 in `r psum[gene == "ATP8"]$n_refs_with_gene`
+of `r n_ref_ok`** and **ND6 in `r psum[gene == "ND6"]$n_refs_with_gene`**. These
+are the same two genes the samples most often lack. Their absence from a
+sample is a detection limit for short or divergent genes, not evidence that
+the sequence is missing. The final matrix has `r n_concat` rows
+(`r n_concat - n_ref_ok` samples + `r n_ref_ok` references) and
+`r n_(max(psum$end))` columns.
+
+## The tree — steps 23–26 {#sec-mito-tree}
+
+```{r}
+#| label: mito-tree-facts
+#| code-summary: "Tree facts quoted below: rooting, Nuttalliella, reference genera"
+mtree  <- read.tree(R("results", "mito", "tree", "mito.treefile"))
+tsid   <- sub("[|].*", "", mtree$tip.label)
+rinfo  <- refsum[status == "ok"][match(tsid, ref_id)]          # NA rows = samples
+fam    <- rinfo$family
+# References only: do they reproduce the accepted higher-level tick taxonomy?
+rt   <- keep.tip(mtree, mtree$tip.label[!is.na(fam)])
+rfam <- fam[!is.na(fam)][match(rt$tip.label, mtree$tip.label[!is.na(fam)])]
+rgen <- rinfo$genus[!is.na(fam)][match(rt$tip.label, mtree$tip.label[!is.na(fam)])]
+rt   <- root(rt, outgroup = rt$tip.label[rfam == "Argasidae"], resolve.root = TRUE)
+nut_ixo   <- rt$tip.label[rfam %in% c("Ixodidae", "Nuttalliellidae")]
+nut_sister <- is.monophyletic(rt, nut_ixo)
+nut_supp  <- rt$node.label[getMRCA(rt, nut_ixo) - Ntip(rt)]
+ixo_mono  <- is.monophyletic(rt, rt$tip.label[rfam == "Ixodidae"])
+gen_mono  <- rbindlist(lapply(unique(rgen), function(g) {
+  w <- rt$tip.label[rgen == g]
+  if (length(w) < 2) return(NULL)
+  data.table(genus = g, n_refs = length(w), monophyletic = is.monophyletic(rt, w))
+}))
+# terminal branch of every tip, to spot long-branch samples
+tb <- setNames(mtree$edge.length[match(seq_along(tsid), mtree$edge[, 2])], tsid)
+mv  <- rtsv("results", "mito", "tables", "mito_vs_metadata.tsv")
+og_n <- uniqueN(refsum[status == "ok" & family == "Argasidae"]$ref_id)
+# the outgroup clade as steps 26/26b root it: the smallest clade holding every
+# Argasidae reference, found with the tree rooted on a non-argasid reference
+t0 <- root(mtree, outgroup = mtree$tip.label[which(fam == "Ixodidae")[1]], resolve.root = TRUE)
+og_clade <- sub("[|].*", "", extract.clade(t0, getMRCA(t0, t0$tip.label[fam[match(t0$tip.label, mtree$tip.label)] %in% "Argasidae"]))$tip.label)
+og_samp  <- mv[sample_id %in% og_clade]
+og_soft  <- og_samp[tick_genus %in% c("Argas", "Ornithodoros", "Alectorobius")]
+og_other <- og_samp[!tick_genus %in% c("Argas", "Ornithodoros", "Alectorobius")]
+```
+
+The partitioned ML tree has `r Ntip(mtree)` tips: `r sum(is.na(fam))` samples
+and `r sum(!is.na(fam))` references. It is rooted on the clade holding the
+`r og_n` Argasidae references, which also holds `r nrow(og_soft)`
+soft-tick samples and `r nrow(og_other)` samples curated as
+`r paste0("*", unique(og_other$tick_genus), "*", collapse = "/")`
+(`r paste0("\x60", og_other$sample_id, "\x60", collapse = ", ")`; see below).
+
+**The references reproduce the accepted tick phylogeny, which is the check
+that the tree can be trusted at depth:**
+
+* Ixodidae is `r if (ixo_mono) "monophyletic" else "**not** monophyletic"`.
+* *Nuttalliella namaqua* is `r if (nut_sister) "sister to Ixodidae" else "**not** sister to Ixodidae"`
+  (SH-aLRT/UFBoot `r nut_supp`). This agrees with published mitogenome
+  analyses that place Nuttalliellidae closest to the hard ticks.
+* `r sum(gen_mono$monophyletic)` of `r nrow(gen_mono)` reference genera with
+  ≥ 2 references are monophyletic. The exceptions are
+  `r paste0("*", gen_mono[monophyletic == FALSE]$genus, "*", collapse = " and ")`.
+  Both are known: *Ornithodoros* in the broad sense is paraphyletic with
+  respect to *Alectorobius* and other argasid genera, and the *Alloceraea*
+  species (*H. inermis*, *H. kitaokai*) fall outside the rest of
+  *Haemaphysalis*.
+
+```{r}
+#| label: mito-ref-genera
+#| code-summary: "Monophyly of each reference genus (references only)"
+tbl(gen_mono, "Reference genera in the mitogenome tree (samples pruned)")
+```
+
+```{r}
+#| fig-cap: "Figure 17 — the partitioned ML mitogenome tree, rooted on the Argasidae clade. Published references in black bold (species and accession); the square at each sample tip is its tick genus (as named when step 21 ran, i.e. from the corrected metadata). Node labels SH-aLRT/UFBoot."
+include_graphics(REL("results", "mito", "figures", "mito_tree.png"))
+```
+
+## Do the curated identifications agree with the mitogenome tree? — step 26b {#sec-mito-check}
+
+The mitogenome tree is **independent molecular evidence** of what each tick
+is. Step 26b relabels every sample tip from the *curated* metadata and asks
+three questions:
+
+1. **What is the selected contig?** Its own nt-BLAST LCA from the main
+   pipeline (`lca/`) is looked up. Since step 21 now accepts only tick contigs,
+   the verdict `NOT_TICK_CONTIG` should never appear; it remains as a check.
+2. **Do its nearest relatives agree?** The 3 nearest tips by patristic
+   distance, samples or references, vote on genus and species.
+3. **What is the nearest named reference?** The closest reference tip, the
+   nearest thing to a named-species identification this tree gives.
+
+It also tests whether each curated genus and species is monophyletic, with
+the references of that name included.
+
+::: {.callout-note}
+## A disagreement is not automatically a metadata error
+The mitogenome is picked by homology from a whole-tick assembly. A disagreement
+can also mean the wrong contig was chosen: a contaminating tick's
+mitogenome, a NUMT, the host's mitogenome, or a sparse sample on a long
+branch. Check `n_genes`, `nn1_dist` and `contig_lca` before deciding.
+:::
+
+```{r}
+#| label: mito-check
+#| code-summary: "Concordance between the curated metadata and the mitogenome tree"
+old_mv <- rtsv("results", "mito", "samples_only", "mito_vs_metadata.tsv")
+print(kable(mv[, .N, by = verdict][order(verdict)], caption = "Concordance verdicts (tree with references)"))
+if (!is.null(old_mv)) {
+  cmp <- merge(old_mv[, .(sample_id, samples_only = verdict)], mv[, .(sample_id, with_refs = verdict)],
+               by = "sample_id", all = TRUE)
+  kable(dcast(cmp[, .N, by = .(samples_only, with_refs)], samples_only ~ with_refs, value.var = "N", fill = 0),
+        caption = "How each sample's verdict changed when the references were added (rows: samples-only tree)")
+}
+```
+
+### Only tick contigs can be selected (step 21)
+
+```{r}
+#| label: mito-gate
+#| code-summary: "Which contigs the tick-LCA gate rejected"
+gate <- sel[, .(sample_id, status, selected_contig_lca, selected_contig_lca_class,
+                n_gene_contigs, n_non_tick_excluded, n_genes_found)]
+tbl(sel[, .N, by = .(status, selected_contig_lca_class)][order(status)],
+    "Step-21 outcome, by the LCA class of the selected contig")
+tbl(sel[status == "no_tick_contig", .(sample_id, tick_species, n_gene_contigs, non_tick_excluded)],
+    "Samples whose mitochondrial genes were found only on non-tick contigs")
+```
+
+The tick probes cannot tell a tick mitogenome from a vertebrate one: a
+blood-meal host's mitogenome carries the same 13 genes and clears the *E*-value
+gate. In the previous run this made step 21 pick the host's mitogenome
+(*Varanus*, *Petrogale*, *Isoodon*) or a bacterial contig with three weak hits
+for 7 samples, which then sat on very long branches outside every tick genus.
+
+::: {.decision}
+**A candidate contig must be a tick by its own nt-BLAST LCA.** Step 21 now
+looks up every candidate contig in the sample's `lca/` file and accepts only
+contigs whose LCA is inside Ixodida (`mito.candidates.lca_filter`). A contig
+with **no** nt hit stays eligible but ranks below confirmed tick contigs:
+complete *Ornithodoros* mitogenomes here have no nt hit, because nt holds no
+close relative. Among eligible contigs, ties in gene count are broken by
+**coverage**, before bitscore. In a mixed tube, bitscore only says which tick
+is closer to the probe set, while coverage says which tick contributed most of
+the DNA.
+:::
+
+`r sum(sel$status == "no_tick_contig")` samples now have no tick mitogenome
+contig at all (table above). No selected contig is classified as non-tick
+(`r sum(mv$verdict == "NOT_TICK_CONTIG")` `NOT_TICK_CONTIG` verdicts).
+
+### Do the curated identifications agree with the tree?
+
+```{r}
+#| label: mito-discordant
+#| code-summary: "Genus- and species-discordant samples, with the nearest reference and the contig's own LCA"
+gd <- mv[verdict == "GENUS_DISCORDANT"]
+tbl(mv[verdict %in% c("GENUS_DISCORDANT", "species_discordant"),
+       .(sample_id, tick_species, verdict, n_genes, nn1, nn1_species, nn1_dist,
+         nearest_ref_species, nearest_ref_dist, contig_lca)],
+    "Samples whose curated identification disagrees with their nearest relatives in the tree")
+```
+
+A sample is genus-discordant when its 3 nearest tips outvote its curated
+genus, **or** when two independent lines agree against it: the contig's own
+nt-BLAST genus and the genus of the nearest reference. The second rule exists
+because the vote has a blind spot. Two tubes holding the *same* foreign tick's
+mitogenome sit together and vote for each other's curated genus.
+
+`r nrow(gd)` samples are genus-discordant in this run, against 19 before the
+review. Most of the earlier ones were either removed (@sec-audit) or had their
+identification corrected (@sec-metadata).
+
+### Contaminant, mixture or wrong tick? — step 26c {#sec-mito-audit}
+
+```{r}
+#| label: mito-audit
+#| code-summary: "Step 26c: the nuclear-rRNA test of every discordant sample"
+aud <- rtsv("results", "mito", "tables", "mito_discordance_audit.tsv")
+sig <- rtsv("results", "mito", "tables", "tick_genus_signal.tsv")
+aud_pre <- rtsv("results", "_pre_exclusion_20261008", "mito", "tables", "mito_discordance_audit.tsv")
+if (!is.null(aud)) {
+  tbl(aud[, .N, by = call][order(-N)], "Step-26c calls in this run")
+  tbl(aud[, .(sample_id, curated_genus, mito_status, mito_genus, rrna_top, rrna_curated_share,
+              mito_hits_top, nearest_sample, nearest_sample_pdist, nearest_same_run, call,
+              exclude_from_mito_tree, exclude_from_species_analyses, reason)],
+      "Every audited sample")
+}
+```
+
+A genus-discordant mitogenome does not say *why* it is discordant. The tube
+may hold another tick altogether, or two ticks, or the right tick plus a trace
+of another tick's DNA that happened to assemble better. Step 26c asks the
+sample's own raw nt BLAST an independent question: **which tick genus do its
+nuclear rRNA contigs (18S, 28S, 5.8S, ITS) belong to?**
+
+::: {.decision}
+**Only high-identity hits, split by subject type, are counted.** The obvious
+measure, the share of all tick BLAST hits going to each genus, does not work.
+nt holds whole nuclear genomes for only a few tick genera, so in a correctly
+labelled *Amblyomma* or *Bothriocroton* sample ~70% of tick hits go to
+*Dermacentor* and ~1% to the curated genus. That share measures nt, not the
+tick. Tick nuclear rRNA and mitochondrial genes are in nt for nearly every
+genus, though, and at ≥ `r params$mito$audit$min_pident`% identity a hit names
+the genus actually present. Each genus's share is weighted by contig
+length × coverage, a proxy for its share of the reads.
+:::
+
+The calls, and what each one means for the sample:
+
+| call | evidence | what to do |
+|---|---|---|
+| `WRONG_TICK` | curated genus < `r 100 * params$mito$audit$rrna_minor`% of both nuclear rRNA and mitochondrial hits | tube swap, mislabel or misidentification: remove, or re-identify |
+| `MIXED_SAMPLE` | two genera both carry real nuclear-rRNA share | which tick is "the sample" cannot be decided: remove |
+| `CONTAMINANT_MITOGENOME` | nuclear rRNA ≥ `r 100 * params$mito$audit$rrna_major`% curated genus, mitogenome of another tick | the ID stands; drop from the mito tree; the microbiome may carry the source sample's microbes |
+| `ID_SUPPORTED`, `ID_SUPPORTED_NO_MITOGENOME` | nuclear rRNA agrees with the curated genus | keep |
+| `UNTESTABLE_GENUS` | the curated genus has no nuclear rRNA in nt | cannot be tested this way |
+| `UNRESOLVED` | no raw BLAST file, or no tick rRNA hit | cannot be tested |
+
+**What the audit of the previous run found, and what was done.** In the
+previous run (`results/_pre_exclusion_20261008/`), step 26c called
+`r if (!is.null(aud_pre)) sum(aud_pre$call == "WRONG_TICK") else "?"` samples
+`WRONG_TICK`, `r if (!is.null(aud_pre)) sum(aud_pre$call == "MIXED_SAMPLE") else "?"`
+`MIXED_SAMPLE` and `r if (!is.null(aud_pre)) sum(aud_pre$call == "CONTAMINANT_MITOGENOME") else "?"`
+`CONTAMINANT_MITOGENOME`. On review, the clearest of these were removed and
+the rest re-identified from the sequence evidence (@sec-audit,
+@sec-metadata). The evidence that decided them:
+
+* **Same-lane identity points at a source.** A foreign mitogenome 0.00% from
+  another sample on the same lane implicates that sample. `8187-F1-Afimb`
+  carried `6700-10-CT-Hbanc`'s *Haemaphysalis* mitogenome, at 7× coverage
+  against that sample's 102×. That is consistent with carry-over into a
+  low-input library. `8184-F1-N1-3-Alimb` was identical to `8302-Argusrobertsi`,
+  but at twice its coverage and with 97% *Argas* nuclear rRNA, so the tube held
+  an *Argas*, not a trace of one.
+* **`8225-3L1`** was three pooled larvae from a long-nosed bandicoot at PHRF,
+  the same host species and site as `8278-F1-Itasm`, whose *Ixodes* mitogenome
+  it carried exactly. Its *Rickettsiella* gltA was also identical to the
+  *I. tasmani* ticks'. It was most likely a genuinely mixed pool.
+* **In every mixture where the curated genus was also present, the foreign
+  mitogenome had the higher coverage**, so the coverage tie-break could not
+  rescue those samples. It did rescue `8164-M1-Amorelia`: its 10× *Amblyomma*
+  mitogenome had lost to a 5× *Bothriocroton* one on bitscore alone.
+
+```{r}
+#| label: aud-now
+#| echo: false
+aud_left <- if (!is.null(aud)) aud[call %in% c("WRONG_TICK", "MIXED_SAMPLE", "UNRESOLVED", "CONTAMINANT_MITOGENOME")] else data.table()
+```
+
+**What the audit still flags in this run.** After the exclusions and ID
+corrections, no sample is called `WRONG_TICK` or `CONTAMINANT_MITOGENOME`.
+`r nrow(aud_left)` sample(s) remain flagged:
+`r if (nrow(aud_left)) paste(sprintf("\x60%s\x60 (%s, %s)", aud_left$sample_id, aud_left$tick_species, aud_left$call), collapse = "; ") else "none"`.
+The `MIXED_SAMPLE` calls come from minority nuclear-rRNA signal from a second
+genus (20–47%). In each of them the selected mitogenome matches the curated
+genus, so they stay in the tree. 26c marks them
+`exclude_from_species_analyses = yes`, but they were **not** removed. This
+is left as a decision for review (@sec-next). The `UNRESOLVED` sample has no
+≥95% tick rRNA hit. Its mitogenome sits on a long, isolated branch, so it
+cannot be checked.
+
+```{r}
+#| label: sens
+#| echo: false
+sens <- perm[test == "tick genus, excl. mito-discordant"]
+full <- perm[test == "tick genus"]
+```
+
+**The analyses in @sec-tickgroups use the corrected identifications, without
+the removed samples.** As a sensitivity test, step 10b repeats the genus
+PERMANOVA without the `r nrow(gd)` ticks that are still genus-discordant in
+this tree. Bray–Curtis R² changes from
+`r round(full[distance == "bray"]$R2, 3)` to
+`r round(sens[distance == "bray"]$R2, 3)`; Aitchison from
+`r round(full[distance == "aitchison"]$R2, 3)` to
+`r round(sens[distance == "aitchison"]$R2, 3)`. The genus-level conclusions
+therefore do not depend on the remaining discordant ticks.
+
+### Every sample's nearest named reference
+
+```{r}
+#| label: mito-nearest-ref
+#| code-summary: "Nearest reference mitogenome per sample"
+tbl(mv[order(tick_genus, tick_species), .(sample_id, tick_species, verdict, nearest_ref_species,
+                                           nearest_ref_dist, ref_genus_agrees, n_genes)],
+    "Nearest published reference mitogenome to each sample (patristic distance, substitutions/site)")
+```
+
+Most Australian species in this collection have **no published mitogenome**,
+so the nearest reference is often a congener, not the species itself. Read
+`nearest_ref_dist` as "how far": below ~0.02 the sample is close to that very
+species; ~0.1–0.3 is a congener; above ~1 the tip is on a long branch and its
+nearest reference means little.
+
+```{r}
+#| label: mito-mono
+#| code-summary: "Monophyly of curated genera and species"
+tbl(rtsv("results", "mito", "tables", "mito_species_monophyly.tsv"),
+    "Is each curated genus / species monophyletic in the mitogenome tree?")
+```
+
+```{r}
+#| fig-cap: "Figure 17b — the mitogenome tree relabelled from the curated metadata, rooted on the Argasidae clade; square = curated tick genus; black 'REF' tips = published mitogenomes; '<<< GENUS' / '< sp.' = disagrees with the tree."
+#| out-width: 100%
+if (file.exists(R("results", "mito", "figures", "mito_tree_curated.png")))
+  include_graphics(REL("results", "mito", "figures", "mito_tree_curated.png"))
+```
+
+```{r}
+#| results: asis
+#| echo: false
+for (f in c("20_fetch_mito_refs.py", "20b_fetch_mito_ref_genomes.py",
+            "21_find_mito_candidates.py", "22_annotate_mitogenomes.py",
+            "23_align_mito_genes.py", "24_concat_partition.py", "25_run_iqtree.py",
+            "26_mito_figures.R", "26b_mito_vs_metadata.R", "26c_mito_discordance_audit.py"))
+  show_code(file.path("code", "analysis", f))
+show_code("metadata/mito_genes.tsv"); show_code("metadata/mito_ref_genomes.tsv")
+show_code("run_mito.sh")
+```
+
+# Decision log {#sec-decisions}
+
+Every judgement call in the pipeline, where it lives, and why.
+
+```{r}
+#| label: decision-log
+#| code-summary: "The decision log"
+dl <- data.table::fread(text = '
+area|decision|why|where
+Abundance unit|TPM renormalised within the microbial fraction|most of each library has no BLAST hit; microbial share is not estimable|04_build_matrices.py
+Abundance unit|Read counts gate presence, never measure abundance|TPM lets a short contig with few reads outrank a genome|config taxon_filter; 10_export_targets.py
+Contig filter|>=300 bp, >=10 reads, bitscore >=100, before renormalising|short noisy contigs otherwise set the TPM denominator; effect shown in 04b|config contig_filter
+Contamination|Reagent contaminants annotated, never removed|no blanks to justify removal; removal left to the analyst|03_build_taxonomy.py
+Contamination|decontam frequency method only if DNA concentrations exist|the one test valid without blanks|08_composition.R
+Taxonomy|Local April 2026 taxdump kept; only merged.dmp updated|keeps backfilled samples comparable with the first 120|make_merged_filtered.py
+Taxonomy|Filter to microbial scope before deduplicating labels|cross-kingdom homonyms (Bacillus, Planococcus)|07_build_tse.R
+Compute|Streaming LCA|original loaded 150 GB BLAST tables into RAM|lca_stream.py
+Metadata|Curated CSV is the source of truth; 05b fixes formatting only, flags content|never silently rewrite field records|05b_import_metadata.py
+Metadata|Sequencing submission / flowcell / lane kept as covariates|only handle on technical variation without controls|05_make_metadata_template.py; 09_diversity.R
+Statistics|Two distances: Bray-Curtis and Aitchison|dominance-driven vs compositional; agreement means the result does not hinge on the choice|09, 10b
+Statistics|Groups with n < 3 drawn, never tested|a mean of one tick is an individual|config tick_groups.min_samples_per_group
+Statistics|PERMDISP reported beside every PERMANOVA|PERMANOVA also responds to spread|10b
+Statistics|Host type tested within tick genus (blocked permutations) + marginal model|host and tick genus are confounded|10b
+Statistics|Species tested after genus, permutations within genus|asks whether species matters beyond genus|10b
+Statistics|Co-occurrence also stratified by tick genus (Mantel-Haenszel)|shared genus preference is not an association|10b
+Statistics|BH correction within each family of tests|many endosymbiont x grouping tests|10b
+Keystone taxa|Defined as dominant inherited symbionts, not network hubs|networks unreliable at this n with compositional data|10b
+Figures|Heatmaps instead of 20-colour stacks; fixed colour per tick genus; second encoding everywhere|colour identity fails beyond ~8 hues and under CVD|10b, 10c, common.R
+Maps|All samples with coordinates mapped, analysed or not|the map is of the sampling|10c
+Maps|Co-located ticks fanned out in the interactive map only; popup gives true coordinates|identical coordinates would hide ticks|10c
+Markers|All target contigs searched, not only confident calls|a marker gene is itself evidence|11-16
+Markers|Competitive paralogue resolution; frames from sequence; stops flagged not fixed|Sca-family cross-hits; merged HSPs off-frame|13, 14
+Markers|Viral probes from the viruses present (Jingmen-like etc.)|type-species probes found nothing|11
+Trees|References chosen for breadth (cap per organism); every reference re-blasted|topology needs species, not 40 copies of one|17, 18
+Trees|Figures labelled from curated metadata|tip names frozen at step 12|19b
+Mito|tblastn order-wide, E-value gated, invertebrate mito code|hard/soft ticks too divergent for blastn; TGA = Trp|21, 22
+Mito|No cross-gene paralogue resolution|deleted correct ND1 calls in 87/149 samples|21
+Mito|Samples with < 3 genes excluded from the tree|mostly missing data -> rogue taxa|config mito.tree.min_genes_for_tree
+Mito|Curated IDs cross-checked against the tree|independent molecular test of the metadata|26b
+Mito|97 published mitogenomes aligned and treed with the samples|named species around every tip; enables rooting|20b; metadata/mito_ref_genomes.tsv
+Mito|Every reference checked against its GenBank title before use|the supplied list contained a frog (NC_028521)|20b
+Mito|References annotated by the same homology method as samples, not GenBank features|UNVERIFIED records lack features; identical gene edges for refs and samples|20b
+Mito|Tree rooted on Argasidae references only; Nuttalliella left free|deepest well-established split; mislabelled samples cannot move the root|config mito.tree.outgroup_family
+Environment|Maps/report in a separate env; analysis env left pinned at R 4.3|adding sf upgraded the whole analysis env|env/tick_report.yml
+Mito|Candidate contig must have a tick (Ixodida) nt-BLAST LCA; no-hit contigs allowed but ranked lower|blood-meal and bacterial contigs were selected for 7 samples|21; config mito.candidates.lca_filter
+Mito|Gene-count ties broken by coverage before bitscore|in a mixed tube bitscore picks the tick closest to the probes, coverage the tick with most DNA|21
+Mito|Discordant samples audited by nuclear-rRNA genus at >= 95% identity|raw per-genus hit shares reflect which tick genomes are in nt, not the tick|26c; config mito.audit
+Samples|Samples removed by decision listed in one file, applied at step 00 and step 21|wrong tick, mixed tube or contaminant mitogenome (26c); raw data untouched|metadata/excluded_samples.tsv
+Figures|theme_classic + light-grey major gridlines on every figure|one consistent style|common.R theme_tick()
+Figures|CSIRO colours, chosen and ordered by simulated colour-vision deficiency; <= 9 hues per figure; outlines + second encoding|brand palette is not CVD-safe by default; some hues too light/dark|common.R; CSIRO_colours.R
+', sep = "|")
+tbl(dl, page = 40)
+```
+
+# Open issues and what to do next {#sec-next}
+
+```{r}
+#| label: todo
+#| echo: false
+rev_n <- nrow(iss[level == "review"])
+disc  <- if (!is.null(mv)) mv[verdict == "GENUS_DISCORDANT", sample_id] else character()
+```
+
+1. **Check the `r rev_n` metadata records flagged *review*** in @sec-metadata,
+   and the `r length(disc)` ticks whose curated genus still disagrees with the
+   mitogenome tree in @sec-mito-check. Step 26c gives the nuclear-rRNA
+   evidence for each (@sec-mito-audit); samples it calls `WRONG_TICK`,
+   `MIXED_SAMPLE` or `UNRESOLVED` are candidates for
+   `metadata/excluded_samples.tsv`.
+2. **`r if (!is.null(aud)) sum(aud$call == "UNRESOLVED") else 0` samples could not be audited**
+   (`UNRESOLVED`: no raw BLAST file, or no tick rRNA hit). Re-running BLAST for them would settle their identity.
+   Also confirm the name for reference `MT371800` (listed *D. taiwanensis*,
+   *D. bellulus* in GenBank) (@sec-mito-refs).
+3. **Add DNA concentrations** (`dna_conc_ng_ul`) to enable the decontam
+   frequency test, and **collection dates** if a temporal question matters.
+4. **Resolve *Rickettsia*, *Coxiella* and *Francisella* to species** from the
+   trees in @sec-trees before any statement about pathogens. Rebuild the
+   informative loci in IQ-TREE.
+
+# Appendix: computational environment {.appendix}
+
+```{r}
+#| label: session
+#| code-summary: "R session used to render this report"
+#| comment: ""
+sessionInfo()
+```

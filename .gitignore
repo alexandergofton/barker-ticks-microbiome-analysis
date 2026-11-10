@@ -28,3 +28,9 @@ code/logs/
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Raw sequencing reads (hundreds of GB)
+raw_data/
+
+# Rendered report: 38 MB self-contained HTML, rebuilt from the .qmd
+report/*.html

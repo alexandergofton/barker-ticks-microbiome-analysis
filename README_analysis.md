@@ -81,6 +81,34 @@ recoveries). Every exclusion is recorded with a diagnosed reason in
 `code/analysis/lca_stream.py` streams by query block instead — measured **flat
 2.34 GB RSS at 225k lines/s on the 149 GB file**, independent of input size.
 
+### Samples removed by decision — `metadata/excluded_samples.tsv`
+
+Ten samples are removed from **every** analysis (microbiome, markers, trees,
+mitogenome) after the step-26c mitogenome audit (`README_mito.md`): wrong tick
+in the tube, a mixed tube, or a contaminating tick's mitogenome. The file gives
+each one with its reason. Step 00 gives them the status `excluded_manual`,
+which every later step honours (matrices, metadata, targets, maps). Step 21
+reads `contigs/` directly, so it skips them too (`common.py:load_excluded`).
+Nothing on disk is touched. To restore a sample, delete its row and re-run.
+
+### Contigs re-assigned by decision — `metadata/contig_reassignments.tsv`
+
+Some contigs carry a wrong nt LCA because the **viral reference records** contain
+tick genomic repeats (see `extracting_pathogens/*/are_these_real.html`). They
+are re-assigned contig by contig. Steps 03 and 04 apply the table on top of
+`lca/<s>.blast.lca` (`common.py:load_contig_reassignments`), so a re-assigned
+contig is filtered exactly like any other contig of its new taxon. The LCA files
+themselves are not edited. Current contents (27,080 contigs, all → Ixodida, so
+scope `host`):
+
+- every *Cheeloo Jingmen-like virus* contig (16,699);
+- every *North shore virus* contig (10,381) except the 9 with RdRp protein
+  support (8143, 8337-Iholo-Xbtp-Awzh, B5119_F1_S15, B6836_N1_S13).
+
+The table is regenerated with
+`python3 extracting_pathogens/curate_tick_repeat_contigs.py`. To undo a
+re-assignment, remove its rows and re-run from step 03.
+
 Two filename aliases are resolved without renaming anything on disk
 (`metadata/sample_aliases.tsv`):
 - `8334-AMLoculosum-BriddledTurn7` (in `lca/`) ≡ `8334-AMLoculosum-BriddledTurn`
@@ -148,11 +176,14 @@ Re-run this after each backfill finishes to pull the new samples in.
 | `04_build_matrices.py` | **the core join**; contig filter, TPM renormalisation, wide matrices |
 | `04b_filter_sensitivity.py` | re-runs under lenient/default/strict to show the filter's effect |
 | `05_make_metadata_template.py` | pre-fills the metadata template |
+| `05b_import_metadata.py` | builds `metadata/sample_metadata.tsv` from the curated CSV; logs issues |
 | `06_validate_metadata.R` | validates your filled-in metadata |
 | `07_build_tse.R` | assembles the TreeSummarizedExperiment |
 | `08_composition.R` | composition, contamination diagnostics, Bracken cross-check |
 | `09_diversity.R` | alpha/beta diversity, PERMANOVA incl. batch terms |
 | `10_export_targets.py` | pathogen/endosymbiont tables + contig index |
+| `10b_tick_group_comparison.R` | composition + endosymbionts compared between tick genera/species |
+| `10c_sampling_maps.R` | static and interactive sampling maps |
 | `verify.py` | assertions over the exported matrices |
 
 ### Marker genes for the targets — `bash run_markers.sh`
@@ -180,6 +211,49 @@ The panel of loci is `metadata/target_markers.tsv` (120 loci over 32 targets) an
 the settings are the `markers:` block of `config/analysis_params.yaml`. Needs
 `env/tick_markers.yml` for MAFFT.
 
+### Trees for those markers — `bash run_trees.sh`
+
+Steps 17–19 close the loop steps 11–16 leave open. Step 15 hands you an
+alignment of sample sequences with nothing to compare them to; these steps
+download the named-species references each locus needs, cut the locus out of
+them, align them with the samples and build a tree. **See `README_trees.md`.**
+
+| script | does |
+|---|---|
+| `17_fetch_tree_refs.py` | downloads the reference sequences that go INTO the trees; cached |
+| `18_curate_tree_refs.py` | blasts each downloaded record and cuts the marker locus out of it |
+| `19_build_trees.py` | aligns samples + references, one FastTree per locus |
+| `19b_tree_figures.R` | roots each tree and draws it |
+
+Two reference panels drive it: `metadata/tree_references.tsv` (per target ×
+marker) and `metadata/tree_ref_genomes.tsv` (per target — several loci exist
+only inside complete genomes, and step 18 cuts them out). Settings are the
+`trees:` block of `config/analysis_params.yaml`.
+
+These are **screening trees** — FastTree, SH-like local support, seconds per
+locus. They resolve endosymbiont from pathogen well enough to decide which loci
+deserve a proper partitioned analysis; they are not the paper's figure.
+
+### Tick mitogenome phylogeny — `bash run_mito.sh`
+
+A separate, independent workflow: extracts one mitochondrial genome candidate
+per sample, annotates its genes, aligns each of the 13 protein-coding genes
+separately, and builds one partitioned ML tree in IQ-TREE (ModelFinder, one
+substitution model per gene) -- a mitogenome phylogeny of the ticks
+themselves. **See `README_mito.md`**, including why MITOS2 (the intended
+annotator) is installed but running on a homology-based fallback here: its
+reference data is Zenodo-hosted and unreachable from this compute node.
+
+| script | does |
+|---|---|
+| `20_fetch_mito_refs.py` | reference probes for 13 PCGs + 2 rRNAs; cached |
+| `21_find_mito_candidates.py` | picks ONE mitogenome contig per sample by homology |
+| `22_annotate_mitogenomes.py` | final per-gene sequences; MITOS2 if available, else homology |
+| `23_align_mito_genes.py` | MAFFT per gene, codon-aware for the 13 PCGs |
+| `24_concat_partition.py` | concatenates the PCGs into one partitioned supermatrix |
+| `25_run_iqtree.py` | ModelFinder + partitioned ML tree, UFBoot + SH-aLRT |
+| `26_mito_figures.R` | tree figure + two distance tables (p-distance, patristic) |
+
 ---
 
 ## Key outputs
@@ -200,6 +274,10 @@ results/
   markers/       sequences/<target>/<target>__<marker>.fna     <- extracted loci
                  alignments/<target>/<target>__<marker>.aln.fasta
                  marker_summary.tsv, marker_by_sample.tsv, marker_gaps.tsv
+                 trees/<target>/<target>__<marker>.{aln.fna,nwk,rooted.nwk,png}
+                 trees/tree_summary.tsv, trees/tree_reference_sequences.tsv
+  mito/          genome/<sample>.mito.fna, genes/<GENE>.fna, tree/mito.treefile
+                 figures/mito_tree.png, tables/mito_distance_{pdistance,patristic}.tsv
   figures/       01..09 png
 ```
 
@@ -226,30 +304,99 @@ NCBI (`results/taxonomy/homonyms.tsv`).
 
 ---
 
-## What you need to supply
+## Sample metadata
 
-**`metadata/sample_metadata.tsv`** — fill in
-`metadata/sample_metadata_TEMPLATE.tsv` and save under that name.
+**The source of truth is `metadata/barker_microbe_analysis_metadata.csv`**:
+one row per sample, with `tick_genus`, `tick_species` (epithet), `life_stage`,
+`n_ticks_pooled`, `host_type`, `host_species`, `location`, `latitude` and
+`longitude`. Edit that file, not anything derived from it.
 
-Pre-filled for you: `sample_id`, `status`, `flowcell`, `index_i7`, `index_i5`,
-`lane`, `seq_run`, `sample_sheet_index`, `seq_submission`, plus **guesses** —
-`tick_species_guess` (84/167, from `metadata/tick_species_abbrev.tsv`),
-`life_stage_guess` and `n_ticks_guess` (125/167, parsed from the `F1`/`2F`/`N3`
-tokens). The guesses are provisional and are superseded by your collaborator's
-mitogenome identifications.
+Step 5b (`05b_import_metadata.py`) joins it to the fields step 5 derives
+automatically: flowcell, lane, index and `seq_submission`, which are the only
+technical covariates this design has, plus the id-string guesses. It writes
+`metadata/sample_metadata.tsv`, which is **regenerated on every run**. Step 5b
+only fixes formatting: stray whitespace, and a `"lat, lon"` pair pasted into
+the latitude column. It never changes content. Anything that looks wrong goes
+to `results/audit/metadata_import_issues.tsv` with level `review`, for you to
+check against the source. Examples are a species that disagrees with the
+sample-id string, or a `host_type` that disagrees with the host named.
 
-To fill by hand: `tick_species`, `life_stage`, `n_ticks_pooled`, `host_species`,
-`collection_site`, `state`, `latitude`, `longitude`, `collection_date`,
-`dna_conc_ng_ul`, `extraction_batch`.
+Derived columns: `tick_species` is the binomial (`Ixodes tasmani`, or
+`Ixodes sp.`), `tick_epithet` keeps the bare epithet, `species_identified`
+is `no` for `sp.`, and `tick_family` is set from the genus.
 
-**`dna_conc_ng_ul` is worth more than it looks.** It enables
-`decontam::isContaminant(method="frequency")`, which needs concentrations rather
-than blanks — the only contamination test this design can actually support.
-Without it, step 8 skips that analysis.
+Not supplied, and therefore not analysed: collection date, state, DNA
+concentration, extraction batch. Without `dna_conc_ng_ul`, step 8 cannot run
+the decontam frequency method, which is the one contamination test this design
+supports without blanks.
 
 ---
 
-## Current findings (118 samples, provisional metadata)
+## Tick genus / species comparison — step 10b
+
+`10b_tick_group_comparison.R` writes tables to `results/tables/tick_groups/`
+and figures 10–15. The settings are in the `tick_groups:` block of the config.
+
+| output | question |
+|---|---|
+| `10_samples_by_tick_and_host.png`, `sample_counts.tsv` | who was sampled; genus × host type confounding |
+| `11a/11b_composition_by_tick_{genus,species}.png`, `mean_composition_by_*.tsv` | mean composition per group (heatmap, top 20 genera) |
+| `12_pcoa_{bray,aitchison}_tick_genus.png`, `permanova.tsv`, `permanova_pairwise_genus.tsv` | does composition differ between genera, between species within a genus, and by host within a genus? |
+| `13a/13b_endosymbiont_prevalence_by_*.png`, `endosymbiont_prevalence_by_*.tsv`, `endosymbiont_fisher_tests.tsv` | which endosymbionts each tick genus/species carries |
+| `14_endosymbiont_abundance_by_genus.png`, `endosymbiont_abundance_kruskal.tsv` | how dominant an endosymbiont is in the ticks that carry it |
+| `15_dominant_genus_by_tick_species.png`, `dominant_genus_per_sample.tsv` | the single most abundant microbial genus in each tick |
+| `endosymbiont_cooccurrence.tsv` | symbiont pairs that co-occur or exclude each other, raw and stratified by genus |
+| `indicator_genera_by_tick_genus.tsv` | microbial genera characteristic of a tick genus (IndVal.g) |
+| `mantel_composition_vs_geography.tsv` | does composition track geographic distance, overall and within genus/species? |
+
+How the tests are built:
+- **Groups with fewer than 3 samples are drawn but never tested.**
+  Unidentified (`sp.`) ticks count toward their genus but not toward any
+  species.
+- **Tick genus and host type are confounded.** *Amblyomma* is mostly on
+  reptiles; *Ixodes* and *Haemaphysalis* are on mammals. Host type is
+  therefore tested with permutations restricted to within-genus blocks
+  (`host type | genus`). A marginal model (`~ genus + host + seq_submission`,
+  `by = "margin"`) gives each term's unique share.
+- **PERMDISP sits beside every single-factor PERMANOVA**
+  (`dispersion_p`). When both are significant, part of the "difference" is
+  spread, not location.
+- **Endosymbiont presence uses the step-10 call** (reads and contigs), never
+  TPM alone. *Rickettsia*, *Francisella* and *Coxiella* are genus-level
+  calls (marked `*`). Each of these genera contains both endosymbionts and
+  pathogens.
+- **Co-occurrence is also tested stratified by tick genus** (exact
+  Mantel–Haenszel). Two symbionts that merely favour the same tick genus are
+  then not reported as associated.
+- **"Keystone" here means the dominant maternally inherited symbionts.** This
+  analysis does not infer keystone taxa from a co-occurrence network. With
+  3–56 samples per genus and compositional, assembly-derived abundances, a
+  network-centrality analysis would not be reliable.
+
+## Sampling maps — step 10c
+
+| output | |
+|---|---|
+| `results/maps/sampling_map.html` | interactive (Leaflet). Toggle tick genera and base layers; click a point for its metadata, dominant microbial genus and endosymbionts. Needs internet for the map tiles. |
+| `16a_sampling_map.png` | all samples: colour = tick genus, shape = host type, size = samples at the site |
+| `16b_sampling_map_by_genus.png` | one panel per tick genus |
+| `16c_endosymbiont_map.png` | where each common endosymbiont was detected vs not |
+| `results/maps/sampling_sites.tsv` | the mapped table |
+
+Every sample with coordinates is mapped, including those never analysed (they
+show faded in the HTML). Samples outside the static extent (the Falklands
+*I. uriae*) are named in the caption. State borders are fetched from Natural
+Earth once and cached in `results/maps/cache/`.
+
+---
+
+## Earlier findings (118 samples, provisional metadata)
+
+> **Superseded.** These numbers predate the backfills (now 149 analysed
+> samples) and the curated metadata. Current results, with every number
+> computed from the outputs, are in **`report/tick_microbiome_report.html`**
+> (source: `report/tick_microbiome_report.qmd`). This section is kept only as a
+> record of the provisional analysis.
 
 **Batch effect is real but small.** PERMANOVA on Bray–Curtis: flowcell/lane
 p=0.001–0.005 but R²≈0.029. Report it; do not adjust it away.
@@ -299,6 +446,38 @@ near-complete genome recovery in the samples that carry them.
 > The same caution applies to *Borrelia* in an Australian context.
 
 ---
+
+## Figure style and colour
+
+Every figure is written as both `.png` and `.svg` with the same name.
+`save_plot()` in `common.R` replaces `ggsave()`. `png_svg()` draws each
+base-graphics figure (pheatmap, phylogenies) once per device. SVGs are
+written with `svglite`, so their text stays editable. svglite lives in a
+separate R library per env (`env/r_lib_svglite*`, see `env/README_svglite.md`),
+not in the pinned conda envs. Without it, SVGs fall back to Cairo
+(text as outlines).
+
+Every ggplot uses `theme_tick()` from `code/analysis/common.R`, which is
+`theme_classic()` plus light-grey major gridlines in both directions, set with
+`theme_set()` when `common.R` is sourced. All colours come from the CSIRO brand
+palette in `CSIRO_colours.R`, read into the named vector `CSIRO`:
+
+- `CSIRO_CAT`: nine categorical hues, **chosen and ordered by computation**.
+  They were simulated under protanopia and deuteranopia (Machado 2009) and scored
+  by OKLab ΔE. Every pair stays ≥ 8.7 apart under both deficiencies and ≥ 15.8
+  under normal vision, and each prefix is the best-separated set of that size.
+  `csiro_cat(n)` returns the first n. A figure never uses more than nine: the
+  rest fold into "other".
+- `TICK_GENUS_PAL`: one fixed hue per tick genus, taken from `CSIRO_CAT`.
+- `CSIRO_OTHER` (Mist) for other / unidentified / not detected. Steel was
+  rejected because it collapses onto Mint and Fuchsia under deuteranopia.
+- `CSIRO_SEQ` / `csiro_seq(n)`: a single-hue white → Midday → Ocean →
+  Midnight Blue ramp for magnitudes.
+- `MARK_OUTLINE` (Midnight Blue) outlines every filled mark. Gold and Light
+  Mint have < 3:1 contrast on white, and brand values cannot be re-stepped.
+
+Identity is never shown by colour alone: there is always a shape, a facet or a
+direct label as well.
 
 ## Tuning
 

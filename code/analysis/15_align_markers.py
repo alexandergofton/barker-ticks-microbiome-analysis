@@ -37,46 +37,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from markers_lib import cfg_markers, out_root, read_fasta, require, run, write_fasta  # noqa: E402
-
-
-def backtranslate(aa_aln: dict[str, str], nt: dict[str, str]) -> dict[str, str]:
-    """Project a protein alignment back onto its own in-frame nucleotides.
-
-    Requires len(nt[name]) == 3 * len(ungapped aa) -- guaranteed by step 14,
-    which trims every CDS locus to whole codons. A mismatch means the two files
-    are out of sync, so it is raised rather than silently truncated.
-    """
-    out: dict[str, str] = {}
-    for name, aligned in aa_aln.items():
-        # MAFFT prefixes a sequence it reverse-complemented with `_R_`; that
-        # only happens with --adjustdirection, which is not used for proteins,
-        # but strip it so a stray prefix cannot break the lookup.
-        key = name[4:] if name.startswith("_R_") and name[4:] in nt else name
-        seq = nt.get(key)
-        if seq is None:
-            raise KeyError(f"no nucleotide sequence for aligned protein {name!r}")
-        ungapped = len(aligned) - aligned.count("-")
-        if len(seq) < ungapped * 3:
-            raise ValueError(f"{name}: {len(seq)} nt for {ungapped} aa -- "
-                             f"steps 14 and 15 are out of sync, re-run step 14")
-        codons, i = [], 0
-        for ch in aligned:
-            if ch == "-":
-                codons.append("---")
-            else:
-                codons.append(seq[i:i + 3])
-                i += 3
-        out[name] = "".join(codons)
-    return out
-
-
-def align(tool: str, opts: list[str], infile: Path, outfile: Path, exe: str) -> None:
-    if tool == "mafft":
-        r = run([exe] + opts + [str(infile)])
-        outfile.write_text(r.stdout)
-    else:  # muscle v5
-        run([exe, "-align", str(infile), "-output", str(outfile)])
+from markers_lib import (align, backtranslate, cfg_markers, out_root, read_fasta,  # noqa: E402
+                         require, write_fasta)
 
 
 def main() -> None:
