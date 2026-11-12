@@ -16,3 +16,6 @@ B5053a_N1_1_14_S10	26c WRONG_TICK: curated Ixodes hirsti; nuclear rRNA and mitog
 0643-M1-2-Bhydro	removed on review (user decision 2026-10-08)
 8261-F1-Atrig	26c CONTAMINANT_MITOGENOME: Amblyomma nuclear rRNA, Bothriocroton mitogenome
 8275-F1	out of scope: non-Australian sample (Ixodes uriae, rockhopper penguin, Pebble Island, Falkland Islands; user decision 2026-11-10)
+5070-847-DECB-ParkhurstHbanc	26c MIXED_SAMPLE, on review: almost no tick DNA (0.6% of reads, no tick mitogenome, rRNA call from 3 contigs); library dominated by Varanus DNA (15% of reads) and shares its Varanus mitogenome and microbiome with 8177 on the same lane (user decision 2026-11-10)
+B1201_M1_1_96_S24	insufficient depth: 0.89 M mapped reads (median 16.3 M), no mitogenome genes, 0.04% microbial reads. 26c MIXED_SAMPLE call reviewed and rejected (Bothriocroton share was a 6-bit BLAST tie on conserved 28S at the same coverage as the Haemaphysalis rRNA) (user decision 2026-11-12)
+8260-F1-Iconf	26c MIXED_SAMPLE, on review: Amblyomma nuclear rRNA (99-100% identity, unambiguous) at ~equal coverage to the Ixodes rRNA; tick DNA 0.1% of reads, 93.6% bacterial; microbiome cannot be attributed to one tick (user decision 2026-11-12)

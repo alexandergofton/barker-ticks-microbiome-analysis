@@ -19,7 +19,7 @@ sample_id	status	tick_species	tick_species_source	life_stage	n_ticks_pooled	host
 4904-M1Aalbo	complete		id_string_guess												Amblyomma albolimbatum	Aalbo			22KM2TLT3	GTGACACGCA	GCTTACGGAC	L008	22KM2TLT3_L008		flowcell_indexed
 4908-N1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	nymph	1	22KM2TLT3	TCCATTGCCG	GAATGCACGA	L008	22KM2TLT3_L008		flowcell_indexed
 4995-Argus	complete		id_string_guess												Argas sp.	Argus			22KM2TLT3	CAGTGGCACT	TAACAATAGG	L008	22KM2TLT3_L008		flowcell_indexed
-5070-847-DECB-ParkhurstHbanc	complete		id_string_guess												Haemaphysalis bancrofti	Hbanc			22KM2TLT3	GTCCTGGATA	CGGTGGCGAA	L008	22KM2TLT3_L008		flowcell_indexed
+5070-847-DECB-ParkhurstHbanc	excluded_manual		id_string_guess												Haemaphysalis bancrofti	Hbanc			22KM2TLT3	GTCCTGGATA	CGGTGGCGAA	L008	22KM2TLT3_L008		flowcell_indexed
 5121-M1-Alimb	excluded_manual		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	GGCAAGCCAG	CAAGCATCCG	L008	22KM2TLT3_L008		flowcell_indexed
 6226-S099Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig			22KM2TLT3	TGGTACCTAA	CATGAGTACT	L008	22KM2TLT3_L008		flowcell_indexed
 627	complete																		22KM2TLT3	TCTATCCTAA	CGTCGACTGG	L008	22KM2TLT3_L008		flowcell_indexed
@@ -63,7 +63,7 @@ sample_id	status	tick_species	tick_species_source	life_stage	n_ticks_pooled	host
 8253-M1-Atrig	complete		id_string_guess												Amblyomma triguttatum	Atrig	male	1	22KM2TLT3	TTCACGAGAC	AGATTGTTAC	L008	22KM2TLT3_L008		flowcell_indexed
 8255-M1-Am-trig-rosei	complete																male	1	22KM2TLT3	GATAGGCCGA	CGCACATGGC	L008	22KM2TLT3_L008		flowcell_indexed
 8256-F1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	female	1	22KM2TLT3	ACCGTTACAA	CTCATAGCGA	L008	22KM2TLT3_L008		flowcell_indexed
-8260-F1-Iconf	complete		id_string_guess												Ixodes confusus	Iconf	female	1	22KM2TLT3	CAGCCGCGTA	ACTAGCCGTG	L008	22KM2TLT3_L008		flowcell_indexed
+8260-F1-Iconf	excluded_manual		id_string_guess												Ixodes confusus	Iconf	female	1	22KM2TLT3	CAGCCGCGTA	ACTAGCCGTG	L008	22KM2TLT3_L008		flowcell_indexed
 8261-F1-Atrig	excluded_manual		id_string_guess												Amblyomma triguttatum	Atrig	female	1	22KM2TLT3	ATGGTTGACT	GGCCTGTCCT	L008	22KM2TLT3_L008		flowcell_indexed
 8261-M1-3-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	male	1	22KM2TLT3	CCACCAGGCA	CTTATGGAAT	L008	22KM2TLT3_L008		flowcell_indexed
 8267	complete																		22N3FNLT3	TGATTATACG	GTCGATTACA	L004	22N3FNLT3_L004		flowcell_indexed
@@ -97,7 +97,7 @@ sample_id	status	tick_species	tick_species_source	life_stage	n_ticks_pooled	host
 8405-Bhydrosauri-1F-VIC	complete		id_string_guess												Bothriocroton hydrosauri	Bhydrosauri	female	1	22N3FNLT3	AACCATAGAA	GGCGAGATGG	L004	22N3FNLT3_L004		flowcell_indexed
 Af_P27_F1_S38	complete																female	1						38	sheet_indexed
 B0512_F1_34_7_S16	complete																female	1						16	sheet_indexed
-B1201_M1_1_96_S24	complete																male	1						24	sheet_indexed
+B1201_M1_1_96_S24	excluded_manual																male	1						24	sheet_indexed
 B2490_F1_74_9_S2	complete																female	1						2	sheet_indexed
 B3015_F1_0_49_S28	complete																female	1						28	sheet_indexed
 B3199_F2_S1	excluded_no_reads																female	2						1	sheet_indexed
