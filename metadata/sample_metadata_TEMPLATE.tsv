@@ -45,7 +45,7 @@ sample_id	status	tick_species	tick_species_source	life_stage	n_ticks_pooled	host
 8166-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp			22KM2TLT3	TTCTACATAC	CTAACTGTAA	L008	22KM2TLT3_L008		flowcell_indexed
 8168A-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	TACGAGTCCA	TAGCGAAGCA	L008	22KM2TLT3_L008		flowcell_indexed
 8174-M1-Alimb	complete		id_string_guess												Amblyomma limbatum	Alimb	male	1	22KM2TLT3	TCTCATGATA	AACACGTGGA	L008	22KM2TLT3_L008		flowcell_indexed
-8177	complete																		22KM2TLT3	TGATTATACG	GTCGATTACA	L008	22KM2TLT3_L008		flowcell_indexed
+8177	excluded_manual																		22KM2TLT3	TGATTATACG	GTCGATTACA	L008	22KM2TLT3_L008		flowcell_indexed
 8178B-M1-Am-sp	complete		id_string_guess												Amblyomma sp.	Am-sp	male	1	22KM2TLT3	TGGCGCGAAC	AACTGATACT	L008	22KM2TLT3_L008		flowcell_indexed
 8180-F1-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb	female	1	22KM2TLT3	ACCGGCCGTA	TGGCAATATT	L008	22KM2TLT3_L008		flowcell_indexed
 8182-Afimb	complete		id_string_guess												Amblyomma fimbriatum	Afimb			22KM2TLT3	GCGTGGATGG	TTGACCAATG	L008	22KM2TLT3_L008		flowcell_indexed
