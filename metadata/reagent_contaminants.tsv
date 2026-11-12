@@ -55,3 +55,4 @@ Microbacterium	low	reported kitome taxon
 Rhodococcus	low	reported kitome taxon
 Deinococcus	low	reported kitome taxon
 Lawsonella	low	skin-associated
+Elizabethkingia	high	batch contaminant in this study, not a literature kitome taxon (user decision 2026-11-12): 15/56 lane 22KM2TLT3_L008 samples (10 at >=5% of microbial TPM) vs traces in 2/28 L004 and 0/38 sheet-indexed; spans tick genera, hosts and states; near-complete genomes in 8180/4995/8186 are 99.8-99.9% identical with the same species mix; unrelated to tick-DNA fraction (rho -0.03)
